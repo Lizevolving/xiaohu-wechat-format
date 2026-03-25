@@ -1,29 +1,113 @@
 # sxx-wechat-format
 
-Claude Code 公众号一键排版+发布技能。Markdown → 微信兼容 HTML → 推送草稿箱，一句话搞定。
+A Claude Code skill that formats Markdown articles into WeChat Official Account (公众号) compatible HTML — with 30 themes, a visual gallery picker, and one-click publishing to drafts.
 
-## 功能
+**[中文说明](README_CN.md)**
 
-- **排版引擎**：Markdown 转微信公众号兼容的内联样式 HTML
-- **30 套主题**：5 大分类（深度长文 / 科技产品 / 文艺随笔 / 活力动态 / 模板布局），可视化画廊选择
-- **AI 内容增强**：自动识别对话体、金句、连续图片，套用 dialogue / callout / gallery 容器
-- **图片处理**：自动处理 Obsidian `![[image]]` 和标准 Markdown `![](image)` 引用
-- **外链转脚注**：微信不支持外链，自动转文末脚注
-- **一键发布**：自动上传图片到微信 CDN + 推送到草稿箱
-- **主题画廊**：浏览器中用真实文章预览所有主题，点选即用
+![Gallery Preview](docs/gallery-preview.png)
 
-## 安装
+## What It Does
+
+1. **Markdown → WeChat HTML**: Converts standard Markdown into inline-styled HTML that works in WeChat's editor (no `<style>` tags, no classes — everything inline)
+2. **30 Themes**: From newspaper-style serif to neon cyberpunk, organized into 5 categories
+3. **Visual Gallery**: Preview all themes with your actual article in a browser, then pick one
+4. **AI Content Enhancement**: Auto-detects dialogue, key quotes, and image sequences — wraps them in styled containers
+5. **One-Click Publish**: Uploads images to WeChat CDN and pushes the article to your drafts
+
+![Bytedance Theme](docs/gallery-bytedance.png)
+
+## Quick Start
 
 ```bash
+# Install
 cd ~/.claude/skills/
 git clone https://github.com/xiaohuailabs/sxx-wechat-format.git
 cp sxx-wechat-format/config.example.json sxx-wechat-format/config.json
 pip3 install markdown requests
+
+# Format an article (opens gallery in browser)
+python3 scripts/format.py --input article.md --gallery
+
+# Format with a specific theme
+python3 scripts/format.py --input article.md --theme newspaper
+
+# Publish to WeChat drafts
+python3 scripts/publish.py --dir /tmp/wechat-format/article-name/ --cover cover.jpg
 ```
 
-## 配置
+## Using with Claude Code
 
-编辑 `config.json`：
+Just say:
+
+```
+排版这篇文章 /path/to/article.md
+```
+
+Claude will:
+1. Read and analyze your article
+2. Auto-enhance content (add dialogue containers, callout blocks, etc.)
+3. Open the theme gallery in your browser
+4. You pick a theme, tell Claude the name
+5. Claude formats and optionally publishes to WeChat
+
+## Themes (30)
+
+### Standalone Styles (9)
+
+| Theme | ID | Style |
+|-------|-----|-------|
+| Terracotta | `terracotta` | Warm orange, rounded headers |
+| ByteDance | `bytedance` | Blue-teal gradient, modern tech |
+| Chinese | `chinese` | Vermillion red, classical |
+| Newspaper | `newspaper` | NYT-style serif, serious |
+| GitHub | `github` | Developer-friendly, light code blocks |
+| SSPAI | `sspai` | Chinese tech media red |
+| Bauhaus | `bauhaus` | Primary colors, geometric |
+| Ink | `ink` | Pure black, minimal whitespace |
+| Midnight | `midnight` | Dark background, neon accents |
+
+### Curated Styles (7)
+
+| Theme | ID | Style |
+|-------|-----|-------|
+| Sports | `sports` | Gradient stripes, energetic |
+| Mint | `mint-fresh` | Mint green, fresh |
+| Sunset | `sunset-amber` | Warm amber tones |
+| Lavender | `lavender-dream` | Purple dreamy |
+| Coffee | `coffee-house` | Brown warm tones |
+| WeChat Native | `wechat-native` | WeChat green |
+| Magazine | `magazine` | Extra whitespace, editorial |
+
+### Template Series (14)
+
+4 layouts (Minimal / Focus / Elegant / Bold) × multiple color variants (Gold / Blue / Red / Green / Navy / Gray)
+
+## Container Syntax
+
+Enhance your Markdown with these containers before formatting:
+
+```markdown
+:::dialogue[Interview Title]
+Alice: Hello there
+Bob: Hi, how are you?
+:::
+
+:::gallery[Screenshots]
+![](img1.jpg)
+![](img2.jpg)
+![](img3.jpg)
+:::
+
+> [!important] Key Insight
+> This is the important takeaway
+
+> [!tip] Pro Tip
+> A useful tip for readers
+```
+
+## Configuration
+
+Edit `config.json`:
 
 ```json
 {
@@ -34,108 +118,32 @@ pip3 install markdown requests
     "auto_open_browser": true
   },
   "wechat": {
-    "app_id": "你的AppID",
-    "app_secret": "你的AppSecret"
+    "app_id": "YOUR_APP_ID",
+    "app_secret": "YOUR_APP_SECRET"
   }
 }
 ```
 
-获取 AppID 和 AppSecret：微信公众号后台 → 设置与开发 → 基本配置
+Get AppID/AppSecret from: WeChat Official Account Admin → Settings → Basic Configuration
 
-**重要**：需要把你的公网 IP 加到公众号后台的 IP 白名单里，否则 API 调用会报 40164 错误。
+**Important**: Add your public IP to the WeChat IP whitelist, otherwise API calls will fail with error 40164.
 
-## 使用
+## How WeChat Compatibility Works
 
-在 Claude Code 里直接说：
+WeChat's editor strips `<style>` tags and CSS classes. This tool:
 
-```
-排版这篇文章 /path/to/article.md
-```
+- Writes all styles as inline `style="..."` attributes on every element
+- Converts `<ul>/<ol>` to `<section>` + flexbox (WeChat mangles native lists)
+- Transforms external links `[text](url)` into footnotes (WeChat blocks external links)
+- Processes `![[image.jpg]]` Obsidian wiki-links and standard `![](image)` references
+- Renders callout blocks (`[!tip]`, `[!important]`, `[!warning]`) with distinct colors
+- Converts dialogue blocks into chat-bubble layouts
 
-### 主题画廊（推荐）
-
-```bash
-python3 scripts/format.py --input article.md --gallery --recommend newspaper magazine ink
-```
-
-在浏览器中用真实文章预览 30 个主题，选好后回到 Claude 说主题名。
-
-### 指定主题排版
-
-```bash
-python3 scripts/format.py --input article.md --theme newspaper
-```
-
-### 推送到公众号
-
-```bash
-python3 scripts/publish.py --dir /tmp/wechat-format/article-name/ --cover cover.jpg
-```
-
-## 主题一览
-
-### 独立风格（9 个）
-
-| 主题 | 命令值 | 风格 |
-|------|--------|------|
-| 赤陶 | terracotta | 暖橙色，满底圆角标题 |
-| 字节蓝 | bytedance | 蓝青渐变，科技现代 |
-| 中国风 | chinese | 朱砂红，古典雅致 |
-| 报纸 | newspaper | 纽约时报风，严肃深度 |
-| GitHub | github | 开发者风，浅色代码块 |
-| 少数派 | sspai | 中文科技媒体红 |
-| 包豪斯 | bauhaus | 红蓝黄三原色，先锋几何 |
-| 墨韵 | ink | 纯黑水墨，极简留白 |
-| 暗夜 | midnight | 深色底+霓虹色 |
-
-### 精选风格（7 个）
-
-| 主题 | 命令值 | 风格 |
-|------|--------|------|
-| 运动 | sports | 渐变色带，活力动感 |
-| 薄荷 | mint-fresh | 薄荷绿，清爽 |
-| 日落 | sunset-amber | 琥珀暖调 |
-| 薰衣草 | lavender-dream | 紫色梦幻 |
-| 咖啡 | coffee-house | 棕色暖调 |
-| 微信原生 | wechat-native | 微信绿 |
-| 杂志 | magazine | 超大留白 |
-
-### 模板系列（14 个）
-
-四种布局（简约 / 聚焦 / 精致 / 醒目）× 多种配色（金 / 蓝 / 红 / 绿 / 藏青 / 灰）
-
-## 容器语法
-
-文章中可使用以下容器增强排版：
-
-```markdown
-:::dialogue[对话标题]
-张三：你好
-李四：你好啊
-:::
-
-:::gallery[图片标题]
-![](img1.jpg)
-![](img2.jpg)
-![](img3.jpg)
-:::
-
-> [!important] 核心观点
-> 这里是重点内容
-
-> [!tip] 小技巧
-> 实用提示
-```
-
-## 自定义主题
-
-在 `themes/` 目录下创建 JSON 文件。参考 `themes/newspaper.json`。
-
-## 依赖
+## Requirements
 
 - Python 3
-- `markdown` 库
-- `requests` 库（推送到公众号时需要）
+- `markdown` library
+- `requests` library (for publishing)
 
 ## License
 
