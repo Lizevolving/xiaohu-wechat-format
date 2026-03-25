@@ -1,10 +1,48 @@
 # xiaohu-wechat-format
 
-公众号一键排版技能。把 Obsidian 里的 Markdown 文章转成微信公众号兼容的排版 HTML，可视化选择主题后一键复制粘贴到微信后台。
+公众号一键排版技能。把任意文本内容（Markdown、纯文本、格式粗糙的笔记）转成微信公众号兼容的排版 HTML，AI 自动理解内容结构并增强排版，可视化选择主题后一键复制粘贴到微信后台。可选生成封面图、推送草稿箱。
 
 ## Skill Description For Claude
 
-把 Markdown 文章转为微信公众号兼容的内联样式 HTML。当用户说"排版""微信排版""格式化文章""format"时使用。
+公众号完整管线：排版 → 封面（可选）→ 推送（可选）。把 Markdown 文章转为微信公众号兼容的内联样式 HTML，支持纯文本输入，AI 自动补充结构和排版增强。当用户说"排版""微信排版""格式化文章""format"时使用。
+
+## 脚本目录
+
+`{baseDir}` = 本 SKILL.md 所在目录。执行脚本时用 `{baseDir}/scripts/xxx.py` 替换为实际绝对路径。
+
+| 脚本 | 用途 |
+|------|------|
+| `scripts/format.py` | 排版：Markdown → 微信兼容 HTML |
+| `scripts/publish.py` | 推送：HTML → 公众号草稿箱 |
+| `scripts/comment_reply.py` | 评论自动回复（可选） |
+
+## 配置
+
+首次使用需创建 `config.json`（参考 `config.example.json`）：
+
+```json
+{
+  "output_dir": "/tmp/wechat-format",
+  "vault_root": "/path/to/your/obsidian/vault",
+  "settings": {
+    "default_theme": "newspaper",
+    "auto_open_browser": true
+  },
+  "wechat": {
+    "app_id": "YOUR_APP_ID",
+    "app_secret": "YOUR_APP_SECRET",
+    "author": "作者名"
+  },
+  "cover": {
+    "output_dir": "~/Documents/covers",
+    "image_generation_script": ""
+  }
+}
+```
+
+- `wechat` 部分仅推送时需要，纯排版可不填
+- `cover` 部分仅生成封面时需要
+- `config.json` 已在 `.gitignore` 中，不会被提交
 
 ## Instructions
 
@@ -25,9 +63,35 @@
 2. 如果没给路径，问用户要文章路径
 3. 读取文章内容，确认标题和字数
 
+#### 第 1.5 步：结构化预处理（仅在需要时）
+
+读取文章后，先检测输入内容的 Markdown 结构完整度，决定是否需要 AI 结构化预处理。
+
+**检测方法**：扫描全文，统计 `##` 标题、`**加粗**`、`- 列表`、`> 引用`、`` ` 代码 ` `` 等格式标记的数量。
+
+**判断规则**：
+- 有 `##` 标题且格式标记分布合理 → **跳过**，直接进入第 2 步
+- 缺少 `##` 标题，或几乎没有格式标记（纯文本/粗糙笔记）→ **执行结构化**
+
+**结构化规则（底线：只加标记，不改内容）**：
+
+1. **加标题**：识别文章的逻辑段落和主题转换点，在转换处插入 `##` 标题。标题从内容中提炼，不编造。三段内容不硬拆五个标题——尊重原文信息密度
+2. **分段落**：确保段落之间有空行分隔，长段落在语义转换处拆分
+3. **加列表**：识别并列/枚举性质的内容，加 `- ` 或 `1. ` 标记
+4. **加强调**：识别关键词、产品名、核心概念，加 `**加粗**`
+5. **清理格式**：去除多余空行、修正缩进、统一标点
+6. **不改措辞**：不调语序、不增删内容、不润色文字。用户写什么就是什么，只加结构标记
+
+**保存与告知**：
+- 结构化后保存为 `/tmp/wechat-format/xxx-structured.md`
+- 告知用户："检测到输入缺少 Markdown 格式标记，已自动补充标题和结构，保存在 xxx-structured.md，可检查调整"
+- 后续第 2 步基于 structured.md 继续处理
+
+---
+
 #### 第 2 步：AI 内容分析 + 自动套格式
 
-读取文章后，Claude 分析内容结构，在 Markdown 层面自动套用合适的排版容器。这是我们比纯手动排版工具强的核心——AI 理解内容，自动匹配最佳呈现方式。
+读取文章（或上一步输出的 structured.md），Claude 分析内容结构，在 Markdown 层面自动套用合适的排版容器。这是我们比纯手动排版工具强的核心——AI 理解内容，自动匹配最佳呈现方式。
 
 **分析维度**：文章类型（访谈/教程/产品介绍/深度分析）、内容元素（对话/图片/代码/数据）、节奏感（密集段 vs 留白段）。
 
@@ -80,7 +144,7 @@
 #### 第 3 步：打开主题画廊（默认流程）
 
 ```bash
-python3 /Users/apple/.claude/skills/xiaohu-wechat-format/scripts/format.py \
+python3 {baseDir}/scripts/format.py \
   --input "文章路径.md" \
   --gallery \
   --recommend newspaper magazine ink
@@ -93,7 +157,7 @@ python3 /Users/apple/.claude/skills/xiaohu-wechat-format/scripts/format.py \
 如果用户已经知道想用哪个主题，可以跳过画廊直接排版：
 
 ```bash
-python3 /Users/apple/.claude/skills/xiaohu-wechat-format/scripts/format.py \
+python3 {baseDir}/scripts/format.py \
   --input "文章路径.md" \
   --theme terracotta
 ```
@@ -104,14 +168,87 @@ python3 /Users/apple/.claude/skills/xiaohu-wechat-format/scripts/format.py \
 - Gallery 模式：在浏览器中切换主题预览，选中后点按钮复制，粘贴到公众号后台
 - 直接模式：在浏览器中检查预览，点「复制到微信」按钮
 
+---
+
+### 封面图生成（可选）
+
+排版完成后，用户说"配封面""生成封面"时执行。
+
+#### 封面提示词模板
+
+```
+请根据提供的内容创建一张吸引眼球的公众号封面图，遵循以下规范：
+
+视觉风格
+- Notion插画风格，比例为 2.35:1（公众号封面标准尺寸）
+- 色彩鲜明、对比强烈，确保在小尺寸预览时依然醒目
+- 风格统一，避免写实元素，保持整体手绘质感
+
+构图要求
+- 主视觉元素居中或偏左（右侧预留标题区域）
+- 添加 1-2 个简洁的卡通形象、图标或知名人物剪影，增强记忆点
+- 大量留白，突出核心信息，避免画面拥挤
+
+文字处理
+- 标题文字大而醒目，控制在 8 字以内
+- 可添加 1 行副标题或关键词标签
+- 字体风格与手绘插画协调统一
+
+吸引力法则
+- 使用悬念、数字、痛点等钩子元素激发点击欲望
+- 视觉元素夸张有反差
+- 色彩搭配参考爆款封面：橙黄、蓝紫、红黑等高对比组合
+
+语言
+- 除非另有说明，默认使用中文
+- 画面内所有可读文字必须使用简体中文，英文只能作为点缀出现
+
+内容主题：{从文章中提炼的一句话主题描述}
+```
+
+#### 封面工作流
+
+1. 从文章提炼一句话主题
+2. 用上述模板生成提示词，保存为 `prompt.md`（YAML 头 `aspect_ratio: "21:9"`, `image_size: "2K"`）
+3. 调用图片生成服务（需在 `config.json` 中配置 `cover.image_generation_script`，或手动使用任意 AI 生图工具）
+4. 生成后默认插入文章标题下方
+
+---
+
+### 推送到公众号草稿箱（可选）
+
+排版完成后，用户说"推送""发公众号"时执行。需要在 `config.json` 配置 `wechat.app_id` 和 `wechat.app_secret`。
+
+```bash
+python3 {baseDir}/scripts/publish.py \
+  --input "排版后的HTML目录" \
+  --cover "封面图路径（可选）"
+```
+
+推送流程：
+1. 读取排版后的 HTML（`article.html`）
+2. 上传文章内图片到微信 CDN
+3. 上传封面图为素材
+4. 创建草稿（自动填充标题、摘要、作者）
+5. 返回 media_id，可在公众号后台「内容管理→草稿箱」查看
+
+---
+
 ### 参数说明
 
+**format.py**：
 - `--input` / `-i`：Markdown 文件路径（必须）
 - `--gallery`：打开主题画廊（推荐，默认使用）
 - `--theme` / `-t`：直接指定主题名（跳过画廊）
 - `--output` / `-o`：输出目录（默认 /tmp/wechat-format）
-- `--recommend`：推荐的主题 ID 列表，gallery 中高亮显示（如 `--recommend newspaper magazine ink`）
+- `--vault-root`：Obsidian Vault 根目录（用于搜索 wikilink 图片）
+- `--recommend`：推荐的主题 ID 列表，gallery 中高亮显示
 - `--no-open`：不自动打开浏览器
+- `--format`：输出格式 wechat/html/plain
+
+**publish.py**：
+- `--input`：排版输出目录路径
+- `--cover`：封面图路径（可选，默认搜索目录内 cover.*）
 
 ### 可用主题（30 个）
 
@@ -145,22 +282,24 @@ python3 /Users/apple/.claude/skills/xiaohu-wechat-format/scripts/format.py \
 
 四种布局（简约/聚焦/精致/醒目）× 多种配色（金/蓝/红/绿/藏青/灰）
 
-### 微信兼容说明
+### 内置排版增强
 
-脚本自动处理以下微信限制：
+脚本自动处理以下内容：
+- **CJK 间距修复**：中英文/中数字之间自动加空格
+- **加粗标点修复**：`**文字，**` → `**文字**，`，中文标点移到标记外
 - **纯内联样式**：所有 CSS 直接写在每个标签的 `style="..."` 属性上
 - **列表模拟**：`<ul>/<ol>` 改为 `<section>` + flexbox 模拟
 - **外链转脚注**：`[text](url)` 自动变成正文 `text[1]` + 文末脚注列表
 - **图片处理**：`![[image.jpg]]` 自动搜索 Vault 并复制到输出目录
 - **多类型提示框**：`[!tip]`/`[!note]`/`[!important]`/`[!warning]`/`[!caution]` 各有独立配色
 - **图说识别**：图片后紧跟的斜体段落自动变为居中灰色图说
-- **对话气泡**：`:::dialogue[标题]` → 左右交替聊天气泡，右侧用主题色
+- **对话气泡**：`:::dialogue[标题]` → 左右交替聊天气泡
 - **图片画廊**：`:::gallery[标题]` → 横向滚动多图容器
 - **长图展示**：`:::longimage[标题]` → 固定高度纵向滚动容器
 
 ### 注意事项
 
-- 依赖 Python `markdown` 库（系统已安装）
-- 图片在预览中可见，但粘贴到微信后需要手动上传
+- 依赖 Python `markdown` 库（`pip install markdown`）
+- 图片在预览中可见，但粘贴到微信后需要手动上传（或用推送功能自动上传）
 - 如果用户对排版不满意，可以切换主题重新生成
 - 画廊模式渲染 20 个主题，用的是用户的真实文章

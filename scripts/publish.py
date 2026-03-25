@@ -210,7 +210,7 @@ def replace_all_images(html, article_dir, token):
     return html, replaced, failed
 
 
-def push_draft(token, title, content, thumb_media_id, author="小互"):
+def push_draft(token, title, content, thumb_media_id, author=""):
     """推送文章到草稿箱"""
     url = f"https://api.weixin.qq.com/cgi-bin/draft/add?access_token={token}"
 
@@ -292,7 +292,7 @@ def main():
     parser.add_argument("--theme", default=None,
                         help="排版主题（仅 --input 模式有效，默认读取 gallery 选中的主题）")
     parser.add_argument("--author", "-a",
-                        default=CONFIG.get("wechat", {}).get("author", "小互"),
+                        default=CONFIG.get("wechat", {}).get("author", ""),
                         help="作者名")
     parser.add_argument("--dry-run", action="store_true",
                         help="只做排版和图片上传，不推送草稿箱（用于测试）")

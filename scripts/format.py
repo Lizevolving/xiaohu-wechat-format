@@ -227,6 +227,59 @@ def strip_frontmatter(content: str) -> str:
     return re.sub(r"^---\n.*?\n---\n*", "", content, flags=re.DOTALL)
 
 
+def fix_cjk_spacing(text: str) -> str:
+    """中英文/中数字之间自动加空格（跳过代码块、行内代码、URL、链接）"""
+    lines = text.split("\n")
+    result = []
+    in_code_block = False
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            result.append(line)
+            continue
+        if in_code_block:
+            result.append(line)
+            continue
+
+        # 保护不应修改的片段
+        protected = []
+        def _protect(m):
+            protected.append(m.group(0))
+            return f"\x00P{len(protected)-1}\x00"
+
+        line = re.sub(r"`[^`]+`", _protect, line)            # 行内代码
+        line = re.sub(r"https?://\S+", _protect, line)       # URL
+        line = re.sub(r"!\[[^\]]*\]\([^)]*\)", _protect, line)  # 图片
+        line = re.sub(r"\[[^\]]*\]\([^)]*\)", _protect, line)   # 链接
+
+        cjk = r"[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]"
+        latin = r"[a-zA-Z0-9]"
+        line = re.sub(f"({cjk})({latin})", r"\1 \2", line)
+        line = re.sub(f"({latin})({cjk})", r"\1 \2", line)
+
+        for i, p in enumerate(protected):
+            line = line.replace(f"\x00P{i}\x00", p)
+        result.append(line)
+
+    return "\n".join(result)
+
+
+def fix_cjk_bold_punctuation(text: str) -> str:
+    """把中文标点移到加粗/斜体标记外面
+
+    **文字，** → **文字**，
+    *文字。*  → *文字*。
+    """
+    cjk_punct = r"[，。！？、；：""''（）【】《》…—]"
+    # **text+标点** → **text**+标点
+    text = re.sub(rf"\*\*([^*]+?)({cjk_punct}+)\*\*", r"**\1**\2", text)
+    # *text+标点* → *text*+标点（不匹配 **）
+    text = re.sub(rf"(?<!\*)\*(?!\*)([^*]+?)({cjk_punct}+)\*(?!\*)", r"*\1*\2", text)
+    return text
+
+
 def convert_wikilinks(text: str, vault_root: Path, output_dir: Path) -> str:
     """把 Obsidian ![[image.jpg]] 转为 <img> 标签，复制图片到输出目录"""
     images_dir = output_dir / "images"
@@ -737,9 +790,9 @@ def _basic_syntax_highlight(code_html: str) -> str:
         r'<span style="color:#c586c0">\1</span>',
         code_html
     )
-    # 单行注释 // ... 和 # ...
+    # 单行注释 // ... 和 # ...（排除 URL 中的 ://）
     code_html = re.sub(
-        r'(//.*?)(<br>|$)',
+        r'(?<!:)(//.*?)(<br>|$)',
         r'<span style="color:#6a9955">\1</span>\2',
         code_html
     )
@@ -1111,8 +1164,10 @@ def inject_inline_styles(html: str, theme: dict, skip_wrapper: bool = False) -> 
         pre_content = protect_spaces(pre_content)
         # 公众号编辑器会吃掉 pre 里的 \n，必须转成 <br> 才能保留换行
         pre_content = pre_content.replace("\n", "<br>")
-        # 语法高亮
-        pre_content = _basic_syntax_highlight(pre_content)
+        # 语法高亮：仅对有语言标记的代码块启用（避免破坏 URL 等纯文本内容）
+        has_language = bool(re.search(r'class="language-', pre_content))
+        if has_language:
+            pre_content = _basic_syntax_highlight(pre_content)
         # 替换内部 code 标签
         pre_content = re.sub(
             r"<code[^>]*>",
@@ -1497,6 +1552,8 @@ def format_for_output(content: str, input_path: Path, theme: dict,
 
     # 通用预处理
     content = strip_frontmatter(content)
+    content = fix_cjk_spacing(content)
+    content = fix_cjk_bold_punctuation(content)
     content = process_callouts(content)
     content = process_manual_footnotes(content)
     content = process_fenced_containers(content)

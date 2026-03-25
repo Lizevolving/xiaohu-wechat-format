@@ -1,6 +1,6 @@
 # xiaohu-wechat-format
 
-Claude Code 公众号一键排版+发布技能。Markdown → 微信兼容 HTML → 推送草稿箱，一句话搞定。
+Claude Code 公众号完整发布管线：**排版** → **封面**（可选）→ **推送**，一句话搞定。
 
 **[English README](README.md)**
 
@@ -11,8 +11,10 @@ Claude Code 公众号一键排版+发布技能。Markdown → 微信兼容 HTML 
 - **排版引擎**：Markdown 转微信公众号兼容的内联样式 HTML
 - **30 套主题**：5 大分类（深度长文 / 科技产品 / 文艺随笔 / 活力动态 / 模板布局），可视化画廊选择
 - **AI 内容增强**：自动识别对话体、金句、连续图片，套用 dialogue / callout / gallery 容器
+- **CJK 排版修复**：中英文自动加空格、加粗标点自动移出标记
 - **图片处理**：自动处理 Obsidian `![[image]]` 和标准 Markdown `![](image)` 引用
 - **外链转脚注**：微信不支持外链，自动转文末脚注
+- **封面图生成**：内置提示词模板，一步出图（需配置生图工具）
 - **一键发布**：自动上传图片到微信 CDN + 推送到草稿箱
 - **主题画廊**：浏览器中用真实文章预览所有主题，点选即用
 
@@ -39,14 +41,20 @@ pip3 install markdown requests
   },
   "wechat": {
     "app_id": "你的AppID",
-    "app_secret": "你的AppSecret"
+    "app_secret": "你的AppSecret",
+    "author": "作者名"
+  },
+  "cover": {
+    "output_dir": "~/Documents/covers",
+    "image_generation_script": ""
   }
 }
 ```
 
-获取 AppID 和 AppSecret：微信公众号后台 → 设置与开发 → 基本配置
-
-**重要**：需要把你的公网 IP 加到公众号后台的 IP 白名单里，否则 API 调用会报 40164 错误。
+- `wechat` 部分仅推送时需要，纯排版可以不填
+- `cover` 部分仅生成封面时需要
+- 获取 AppID 和 AppSecret：微信公众号后台 → 设置与开发 → 基本配置
+- **重要**：需要把你的公网 IP 加到公众号后台的 IP 白名单里，否则 API 调用会报 40164 错误
 
 ## 使用
 

@@ -7,6 +7,11 @@
   },
   "wechat": {
     "app_id": "YOUR_APP_ID",
-    "app_secret": "YOUR_APP_SECRET"
+    "app_secret": "YOUR_APP_SECRET",
+    "author": "作者名"
+  },
+  "cover": {
+    "output_dir": "~/Documents/covers",
+    "image_generation_script": ""
   }
 }

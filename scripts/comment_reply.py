@@ -4,7 +4,7 @@
 
 功能：
 - 扫描已发布文章的新评论
-- 用 AI 生成符合小互风格的回复
+- 用 AI 生成风格化的回复
 - 自动发送回复
 - 记录已回复的评论，避免重复
 
@@ -28,8 +28,8 @@ CONFIG_PATH = SCRIPT_DIR.parent / "config.json"
 STATE_PATH = SCRIPT_DIR.parent / "comment_state.json"
 LOG_PATH = SCRIPT_DIR.parent / "comment_reply.log"
 
-# AI 回复的系统提示
-SYSTEM_PROMPT = """你是公众号"小互"的作者，回复读者评论。
+# AI 回复的系统提示（请修改为你自己的公众号名称和风格）
+SYSTEM_PROMPT = """你是公众号的作者，回复读者评论。
 
 ## 两种模式
 

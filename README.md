@@ -1,6 +1,6 @@
 # xiaohu-wechat-format
 
-A Claude Code skill that formats Markdown articles into WeChat Official Account (公众号) compatible HTML — with 30 themes, a visual gallery picker, and one-click publishing to drafts.
+A Claude Code skill for the full WeChat Official Account (公众号) publishing pipeline: **Format** → **Cover** (optional) → **Publish** — with 30 themes, a visual gallery picker, AI content enhancement, and one-click publishing to drafts.
 
 **[中文说明](README_CN.md)**
 
@@ -119,19 +119,33 @@ Edit `config.json`:
   },
   "wechat": {
     "app_id": "YOUR_APP_ID",
-    "app_secret": "YOUR_APP_SECRET"
+    "app_secret": "YOUR_APP_SECRET",
+    "author": "Author Name"
+  },
+  "cover": {
+    "output_dir": "~/Documents/covers",
+    "image_generation_script": ""
   }
 }
 ```
 
-Get AppID/AppSecret from: WeChat Official Account Admin → Settings → Basic Configuration
+- `wechat` section is only needed for publishing; formatting works without it
+- `cover` section is only needed for cover image generation
+- Get AppID/AppSecret from: WeChat Official Account Admin → Settings → Basic Configuration
+- **Important**: Add your public IP to the WeChat IP whitelist, otherwise API calls will fail with error 40164
 
-**Important**: Add your public IP to the WeChat IP whitelist, otherwise API calls will fail with error 40164.
+## Cover Image Generation (Optional)
+
+After formatting, ask Claude to generate a cover image. The skill includes a built-in prompt template optimized for WeChat cover images (2.35:1 ratio, Notion illustration style).
+
+You need an image generation tool configured in `config.json` → `cover.image_generation_script`, or simply use any AI image generator manually with the prompt from `SKILL.md`.
 
 ## How WeChat Compatibility Works
 
 WeChat's editor strips `<style>` tags and CSS classes. This tool:
 
+- **CJK spacing fix**: Auto-adds spaces between Chinese and English/numbers
+- **Bold punctuation fix**: Moves Chinese punctuation outside bold markers (`**text，**` → `**text**，`)
 - Writes all styles as inline `style="..."` attributes on every element
 - Converts `<ul>/<ol>` to `<section>` + flexbox (WeChat mangles native lists)
 - Transforms external links `[text](url)` into footnotes (WeChat blocks external links)
