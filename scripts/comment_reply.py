@@ -260,14 +260,12 @@ def main():
     config = load_config()
     state = load_state()
 
-    # AI 配置（复用 twittersave 的 OpenRouter）
-    tw_config = json.load(open(
-        Path.home() / ".claude/skills/xiaohu-twittersave/config.json", "r"
-    ))
+    # AI 配置（从本技能 config.json 的 ai 字段读取，或环境变量 OPENROUTER_API_KEY）
+    ai_section = config.get("ai", {})
     ai_config = {
-        "url": tw_config.get("settings", {}).get("twai_url", "https://openrouter.ai/api/v1"),
-        "key": tw_config.get("secrets", {}).get("twai_api_key", ""),
-        "model": "anthropic/claude-sonnet-4",
+        "url": ai_section.get("url", os.environ.get("OPENROUTER_URL", "https://openrouter.ai/api/v1")),
+        "key": ai_section.get("api_key", os.environ.get("OPENROUTER_API_KEY", "")),
+        "model": ai_section.get("model", "anthropic/claude-sonnet-4"),
     }
 
     # 获取 token

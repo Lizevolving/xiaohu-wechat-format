@@ -221,7 +221,7 @@ python3 {baseDir}/scripts/format.py \
 
 ```bash
 python3 {baseDir}/scripts/publish.py \
-  --input "排版后的HTML目录" \
+  --dir "排版输出目录" \
   --cover "封面图路径（可选）"
 ```
 
@@ -231,6 +231,14 @@ python3 {baseDir}/scripts/publish.py \
 3. 上传封面图为素材
 4. 创建草稿（自动填充标题、摘要、作者）
 5. 返回 media_id，可在公众号后台「内容管理→草稿箱」查看
+
+也支持从 Markdown 直接推送（自动排版再推）：
+
+```bash
+python3 {baseDir}/scripts/publish.py \
+  --input "文章.md" \
+  --theme terracotta
+```
 
 ---
 
@@ -247,8 +255,13 @@ python3 {baseDir}/scripts/publish.py \
 - `--format`：输出格式 wechat/html/plain
 
 **publish.py**：
-- `--input`：排版输出目录路径
-- `--cover`：封面图路径（可选，默认搜索目录内 cover.*）
+- `--dir`：排版输出目录路径（已排版好的 HTML）
+- `--input`：Markdown 文件路径（自动排版再推送）
+- `--cover` / `-c`：封面图路径（可选，默认搜索目录内 cover.*）
+- `--title` / `-t`：文章标题（默认从 HTML 提取）
+- `--theme`：排版主题（仅 `--input` 模式有效）
+- `--author` / `-a`：作者名（默认读 config.json）
+- `--dry-run`：只做排版和图片上传，不推送草稿箱
 
 ### 可用主题（30 个）
 

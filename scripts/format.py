@@ -283,8 +283,18 @@ def fix_cjk_bold_punctuation(text: str) -> str:
 def convert_wikilinks(text: str, vault_root: Path, output_dir: Path) -> str:
     """把 Obsidian ![[image.jpg]] 转为 <img> 标签，复制图片到输出目录"""
     images_dir = output_dir / "images"
-    # 搜索路径：vault 目录 + AIphoto 图片目录
-    search_roots = [vault_root, Path.home() / "Documents" / "AIphoto"]
+    # 搜索路径：vault 目录（如需额外图片目录，在 config.json 的 image_search_paths 中配置）
+    search_roots = [vault_root]
+    # 支持自定义图片搜索目录
+    config_path = SKILL_DIR / "config.json"
+    if config_path.exists():
+        import json as _json
+        try:
+            _cfg = _json.load(open(config_path, encoding="utf-8"))
+            for p in _cfg.get("image_search_paths", []):
+                search_roots.append(Path(p).expanduser())
+        except Exception:
+            pass
 
     def replace_img(match):
         filename = match.group(1).strip()

@@ -70,7 +70,7 @@ pip3 install markdown requests
 python3 scripts/format.py --input article.md --gallery --recommend newspaper magazine ink
 ```
 
-在浏览器中用真实文章预览 30 个主题，选好后回到 Claude 说主题名。
+在浏览器中用真实文章预览 20 个核心主题，选好后回到 Claude 说主题名。
 
 ### 指定主题排版
 
