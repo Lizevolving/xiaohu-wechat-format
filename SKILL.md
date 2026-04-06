@@ -2,9 +2,14 @@
 
 公众号一键排版技能。把任意文本内容（Markdown、纯文本、格式粗糙的笔记）转成微信公众号兼容的排版 HTML，AI 自动理解内容结构并增强排版，可视化选择主题后一键复制粘贴到微信后台。可选生成封面图、推送草稿箱。
 
-## Skill Description For Claude
+## Skill Description For Claude / Codex / Other Agents
 
 公众号完整管线：排版 → 封面（可选）→ 推送（可选）。把 Markdown 文章转为微信公众号兼容的内联样式 HTML，支持纯文本输入，AI 自动补充结构和排版增强。当用户说"排版""微信排版""格式化文章""format"时使用。
+
+补充约定：
+- 这套流程不只给 Claude，用于 Codex 或其他能调用脚本的 Agent 也完全成立。
+- 当用户给出 Markdown 路径时，默认把结果输出到该 Markdown 同级目录下新建的 `wechat output/`。
+- 画廊只是选样式和预览，复制到公众号后台之后，用户仍然可以继续微调文字。
 
 ## 脚本目录
 
@@ -22,7 +27,7 @@
 
 ```json
 {
-  "output_dir": "/tmp/wechat-format",
+  "output_dir": "./wechat-output-cache",
   "vault_root": "/path/to/your/obsidian/vault",
   "settings": {
     "default_theme": "newspaper",
@@ -83,7 +88,7 @@
 6. **不改措辞**：不调语序、不增删内容、不润色文字。用户写什么就是什么，只加结构标记
 
 **保存与告知**：
-- 结构化后保存为 `/tmp/wechat-format/xxx-structured.md`
+- 结构化后保存为系统临时目录下的 `wechat-format/xxx-structured.md`
 - 告知用户："检测到输入缺少 Markdown 格式标记，已自动补充标题和结构，保存在 xxx-structured.md，可检查调整"
 - 后续第 2 步基于 structured.md 继续处理
 
@@ -91,7 +96,7 @@
 
 #### 第 2 步：AI 内容分析 + 自动套格式
 
-读取文章（或上一步输出的 structured.md），Claude 分析内容结构，在 Markdown 层面自动套用合适的排版容器。这是我们比纯手动排版工具强的核心——AI 理解内容，自动匹配最佳呈现方式。
+读取文章（或上一步输出的 structured.md），由当前 Agent 分析内容结构，在 Markdown 层面自动套用合适的排版容器。这是我们比纯手动排版工具强的核心：AI 理解内容，自动匹配最佳呈现方式。
 
 **分析维度**：文章类型（访谈/教程/产品介绍/深度分析）、内容元素（对话/图片/代码/数据）、节奏感（密集段 vs 留白段）。
 
@@ -124,7 +129,7 @@
 
 7. **外部链接** → 无需处理（脚本自动转脚注）
 
-**处理完成后**，把增强后的 Markdown 保存为临时文件（`/tmp/wechat-format/xxx-enhanced.md`）。
+**处理完成后**，把增强后的 Markdown 保存为系统临时目录下的临时文件（`wechat-format/xxx-enhanced.md`）。
 
 #### 第 2.5 步：推荐主题
 
@@ -150,6 +155,8 @@ python3 {baseDir}/scripts/format.py \
   --recommend newspaper magazine ink
 ```
 
+输出结果默认写到该文章同级目录下的 `wechat output/`。
+
 这会用用户的**真实文章**渲染 20 个主题，在浏览器打开画廊页面。用户点按钮切换主题预览，选中后点「用这个风格排版」一键复制到剪贴板。
 
 #### 第 3 步（备选）：直接指定主题排版
@@ -166,6 +173,7 @@ python3 {baseDir}/scripts/format.py \
 
 告诉用户：
 - Gallery 模式：在浏览器中切换主题预览，选中后点按钮复制，粘贴到公众号后台
+- 复制按钮本身就会带走当前样式，不需要强依赖“确认样式”按钮
 - 直接模式：在浏览器中检查预览，点「复制到微信」按钮
 
 ---
@@ -248,7 +256,7 @@ python3 {baseDir}/scripts/publish.py \
 - `--input` / `-i`：Markdown 文件路径（必须）
 - `--gallery`：打开主题画廊（推荐，默认使用）
 - `--theme` / `-t`：直接指定主题名（跳过画廊）
-- `--output` / `-o`：输出目录（默认 /tmp/wechat-format）
+- `--output` / `-o`：输出目录（默认：当前 Markdown 同级的 `wechat output/`）
 - `--vault-root`：Obsidian Vault 根目录（用于搜索 wikilink 图片）
 - `--recommend`：推荐的主题 ID 列表，gallery 中高亮显示
 - `--no-open`：不自动打开浏览器
@@ -265,7 +273,7 @@ python3 {baseDir}/scripts/publish.py \
 
 ### 可用主题（30 个）
 
-#### 独立风格（9 个，差异最大）
+#### 主干主题（9 个，差异最大）
 
 | 主题 | 命令值 | 风格 |
 |------|--------|------|

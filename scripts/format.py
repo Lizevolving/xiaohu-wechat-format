@@ -11,12 +11,19 @@
 """
 
 import argparse
+import copy
+import http.server
 import json
 import os
 import re
+import socket
+import subprocess
 import shutil
 import sys
+import tempfile
+import time
 import uuid
+import urllib.request
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -52,9 +59,29 @@ GALLERY_THEMES = [
     "terracotta", "mint-fresh", "sunset-amber", "lavender-dream",
     # 活力动态（4）
     "sports", "bauhaus", "chinese", "wechat-native",
-    # 模板布局（4，每种布局1个代表）
-    "minimal-gold", "focus-blue", "elegant-green", "bold-blue",
+    # 极简（1）
+    "minimal-flex",
 ]
+GALLERY_GROUPS = [
+    ("深度长文", ["newspaper", "magazine", "ink", "coffee-house"]),
+    ("科技产品", ["bytedance", "github", "sspai", "midnight"]),
+    ("文艺随笔", ["terracotta", "mint-fresh", "sunset-amber", "lavender-dream"]),
+    ("活力动态", ["sports", "bauhaus", "chinese", "wechat-native"]),
+    ("极简", ["minimal-flex"]),
+]
+MINIMAL_FLEX_THEME_ID = "minimal-flex"
+MINIMAL_FLEX_BASE_ACCENT = "#4E5969"
+MINIMAL_FLEX_ACCENTS = {
+    "gray": {"label": "石板灰", "hex": "#4E5969"},
+    "blue": {"label": "主题蓝", "hex": "#4B6EF5"},
+    "green": {"label": "松针绿", "hex": "#2BAE85"},
+    "red": {"label": "焦点红", "hex": "#F25C54"},
+    "navy": {"label": "藏青", "hex": "#1F4F8A"},
+    "gold": {"label": "暖金", "hex": "#C8A062"},
+}
+MINIMAL_FLEX_ALIGNS = ["left", "center", "right"]
+MINIMAL_FLEX_DIVIDERS = ["solid-full", "solid-short", "none"]
+DEFAULT_FONT_SIZE = 15
 
 # Gallery 示例文章（写死，不用用户文章）
 GALLERY_DEMO_MARKDOWN = """\
@@ -103,10 +130,266 @@ TEMPLATE_DIR = SKILL_DIR / "templates"
 with open(SKILL_DIR / "config.json", encoding="utf-8") as f:
     CONFIG = json.load(f)
 
-OUTPUT_DIR = Path(CONFIG["output_dir"])
 VAULT_ROOT = Path(CONFIG["vault_root"])
 DEFAULT_THEME = CONFIG["settings"]["default_theme"]
 AUTO_OPEN = CONFIG["settings"]["auto_open_browser"]
+SELECTION_DIR = Path(tempfile.gettempdir()) / "wechat-format"
+STYLE_SELECTION_FILE = SELECTION_DIR / "selected-style.json"
+THEME_SELECTION_FILE = SELECTION_DIR / "selected-theme.txt"
+
+
+def resolve_output_dir(input_path: Path, explicit_output: str | None) -> Path:
+    """默认输出到文章所在目录下的 wechat output 文件夹。"""
+    if explicit_output:
+        return Path(explicit_output)
+    return input_path.parent / "wechat output"
+
+
+def build_style_selection(theme_id: str, accent: str | None = None,
+                          heading_align: str | None = None,
+                          divider_style: str | None = None,
+                          font_size: int = DEFAULT_FONT_SIZE) -> dict:
+    """规范化样式选择结果。"""
+    selection = {
+        "theme_id": theme_id,
+        "accent": None,
+        "heading_align": None,
+        "divider_style": None,
+        "font_size": int(font_size) if font_size else DEFAULT_FONT_SIZE,
+    }
+
+    if theme_id != MINIMAL_FLEX_THEME_ID:
+        if accent or heading_align or divider_style:
+            raise ValueError(
+                f"主题 '{theme_id}' 不支持 --accent / --heading-align / --divider-style。"
+            )
+        return selection
+
+    normalized_accent = accent or "gray"
+    normalized_align = heading_align or "left"
+    normalized_divider = divider_style or "solid-full"
+
+    if normalized_accent not in MINIMAL_FLEX_ACCENTS:
+        raise ValueError(
+            f"不支持的 accent: {normalized_accent}，可用值: {', '.join(MINIMAL_FLEX_ACCENTS)}"
+        )
+    if normalized_align not in MINIMAL_FLEX_ALIGNS:
+        raise ValueError(
+            f"不支持的 heading_align: {normalized_align}，可用值: {', '.join(MINIMAL_FLEX_ALIGNS)}"
+        )
+    if normalized_divider not in MINIMAL_FLEX_DIVIDERS:
+        raise ValueError(
+            f"不支持的 divider_style: {normalized_divider}，可用值: {', '.join(MINIMAL_FLEX_DIVIDERS)}"
+        )
+
+    selection.update({
+        "accent": normalized_accent,
+        "heading_align": normalized_align,
+        "divider_style": normalized_divider,
+    })
+    return selection
+
+
+def write_selected_style(selection: dict, output_dir: Path = SELECTION_DIR) -> None:
+    """写入结构化样式选择结果，同时保留旧的主题文件。"""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    normalized = build_style_selection(
+        selection.get("theme_id", DEFAULT_THEME),
+        selection.get("accent"),
+        selection.get("heading_align"),
+        selection.get("divider_style"),
+        selection.get("font_size", DEFAULT_FONT_SIZE),
+    )
+    (output_dir / STYLE_SELECTION_FILE.name).write_text(
+        json.dumps(normalized, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (output_dir / THEME_SELECTION_FILE.name).write_text(
+        normalized["theme_id"],
+        encoding="utf-8",
+    )
+
+
+def read_selected_style(selection_dir: Path = SELECTION_DIR) -> dict | None:
+    """读取结构化样式选择结果。"""
+    style_file = selection_dir / STYLE_SELECTION_FILE.name
+    if not style_file.exists():
+        return None
+    try:
+        raw = json.loads(style_file.read_text(encoding="utf-8"))
+        return build_style_selection(
+            raw.get("theme_id", DEFAULT_THEME),
+            raw.get("accent"),
+            raw.get("heading_align"),
+            raw.get("divider_style"),
+            raw.get("font_size", DEFAULT_FONT_SIZE),
+        )
+    except Exception:
+        return None
+
+
+def apply_theme_variants(theme_name: str, theme: dict, selection: dict | None) -> dict:
+    """根据选择结果生成最终主题。"""
+    if theme_name != MINIMAL_FLEX_THEME_ID:
+        return theme
+
+    final_theme = copy.deepcopy(theme)
+    selection = build_style_selection(
+        MINIMAL_FLEX_THEME_ID,
+        selection.get("accent") if selection else None,
+        selection.get("heading_align") if selection else None,
+        selection.get("divider_style") if selection else None,
+        selection.get("font_size", DEFAULT_FONT_SIZE) if selection else DEFAULT_FONT_SIZE,
+    )
+
+    accent_hex = MINIMAL_FLEX_ACCENTS[selection["accent"]]["hex"]
+    heading_align = selection["heading_align"]
+    divider_style = selection["divider_style"]
+
+    final_theme["name"] = (
+        f'{theme.get("name", "极简·可调")} · '
+        f'{MINIMAL_FLEX_ACCENTS[selection["accent"]]["label"]}'
+    )
+    final_theme.setdefault("colors", {})
+    final_theme["colors"]["accent"] = accent_hex
+    final_theme["colors"]["hr_color"] = accent_hex
+
+    styles = final_theme.setdefault("styles", {})
+    for key in ("h1", "h2", "h3", "h4", "h5", "strong", "a", "footnote_sup", "callout_title"):
+        if key in styles:
+            styles[key]["color"] = accent_hex
+    for key in ("h1", "h2", "h3", "h4", "h5"):
+        if key in styles:
+            styles[key]["text_align"] = heading_align
+
+    if "list_item_bullet" in styles:
+        styles["list_item_bullet"]["color"] = accent_hex
+    if "ol_item_bullet" in styles:
+        styles["ol_item_bullet"]["color"] = accent_hex
+
+    hr_styles = styles.setdefault("hr", {})
+    hr_styles.update({
+        "height": "1px",
+        "border": "none",
+        "background": accent_hex,
+    })
+    if divider_style == "solid-full":
+        hr_styles.update({
+            "width": "100%",
+            "margin_left": "0",
+            "margin_right": "0",
+            "display": "block",
+        })
+    elif divider_style == "solid-short":
+        hr_styles.update({
+            "width": "72px",
+            "margin_left": "auto",
+            "margin_right": "auto",
+            "display": "block",
+        })
+    else:
+        hr_styles.update({
+            "display": "none",
+            "width": "0",
+            "height": "0",
+            "background": "transparent",
+            "margin_top": "0",
+            "margin_bottom": "0",
+        })
+
+    return final_theme
+
+
+def _find_free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        sock.listen(1)
+        return sock.getsockname()[1]
+
+
+def start_gallery_server(output_dir: Path, selection_dir: Path = SELECTION_DIR,
+                         idle_timeout: int = 1800) -> str:
+    """启动本地 gallery 服务器，支持保存选择结果。"""
+    port = _find_free_port()
+    gallery_url = f"http://127.0.0.1:{port}/gallery.html"
+    cmd = [
+        sys.executable,
+        str(SCRIPT_DIR / "format.py"),
+        "--serve-gallery-dir", str(output_dir),
+        "--serve-gallery-port", str(port),
+        "--serve-selection-dir", str(selection_dir),
+        "--serve-idle-timeout", str(idle_timeout),
+    ]
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+    subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        cwd=str(output_dir),
+        creationflags=creationflags,
+        close_fds=True,
+    )
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(gallery_url, timeout=0.5) as resp:
+                if resp.status == 200:
+                    return gallery_url
+        except Exception:
+            time.sleep(0.15)
+    raise RuntimeError(f"本地 gallery 服务启动失败: {gallery_url}")
+
+
+def run_gallery_server(directory: Path, port: int, selection_dir: Path,
+                       idle_timeout: int = 1800) -> None:
+    """运行轻量本地服务，为 gallery 提供保存选择结果的 API。"""
+
+    class GalleryHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(directory), **kwargs)
+
+        def log_message(self, format, *args):
+            return
+
+        def _touch(self):
+            self.server.last_activity = time.time()
+
+        def do_GET(self):
+            self._touch()
+            super().do_GET()
+
+        def do_POST(self):
+            self._touch()
+            if self.path != "/api/selection":
+                self.send_error(404)
+                return
+
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                write_selected_style(payload, selection_dir)
+            except Exception as exc:
+                body = json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False).encode("utf-8")
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            body = json.dumps({"ok": True}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), GalleryHandler)
+    server.timeout = 1
+    server.last_activity = time.time()
+    while time.time() - server.last_activity < idle_timeout:
+        server.handle_request()
 
 
 # ── 主题加载 ────────────────────────────────────────────────────────────
@@ -290,7 +573,8 @@ def convert_wikilinks(text: str, vault_root: Path, output_dir: Path) -> str:
     if config_path.exists():
         import json as _json
         try:
-            _cfg = _json.load(open(config_path, encoding="utf-8"))
+            with open(config_path, encoding="utf-8") as f:
+                _cfg = _json.load(f)
             for p in _cfg.get("image_search_paths", []):
                 search_roots.append(Path(p).expanduser())
         except Exception:
@@ -1465,10 +1749,12 @@ def truncate_html_preview(html: str, max_p_tags: int = 12) -> str:
 
 def _render_single_theme(tid, theme_data, gallery_html, gallery_footnote):
     """渲染单个主题（用于并行 gallery）"""
-    rendered = inject_inline_styles(gallery_html, theme_data)
+    selection = build_style_selection(tid) if tid == MINIMAL_FLEX_THEME_ID else None
+    final_theme = apply_theme_variants(tid, theme_data, selection)
+    rendered = inject_inline_styles(gallery_html, final_theme)
     rendered = convert_image_captions(rendered)
     if gallery_footnote:
-        fn_rendered = inject_inline_styles(gallery_footnote, theme_data, skip_wrapper=True)
+        fn_rendered = inject_inline_styles(gallery_footnote, final_theme, skip_wrapper=True)
         rendered += "\n" + fn_rendered
     return tid, rendered
 
@@ -1485,20 +1771,17 @@ def generate_gallery(rendered_map: dict, theme_map: dict,
     default_theme = theme_ids[0] if theme_ids else ""
 
     # 生成 THEME_BUTTONS（带分组标签）
-    GROUPS = [
-        ("深度长文", ["newspaper", "magazine", "ink", "coffee-house"]),
-        ("科技产品", ["bytedance", "github", "sspai", "midnight"]),
-        ("文艺随笔", ["terracotta", "mint-fresh", "sunset-amber", "lavender-dream"]),
-        ("活力动态", ["sports", "bauhaus", "chinese", "wechat-native"]),
-        ("模板布局", ["minimal-gold", "focus-blue", "elegant-green", "bold-blue"]),
-    ]
     buttons_html = ""
     btn_index = 0
-    for group_name, group_ids in GROUPS:
+    for group_name, group_ids in GALLERY_GROUPS:
         group_tids = [t for t in group_ids if t in theme_ids]
         if not group_tids:
             continue
-        buttons_html += f'<div class="theme-group"><span class="group-label">{group_name}</span>'
+        buttons_html += (
+            f'<section class="theme-group">'
+            f'<div class="group-label">{group_name}</div>'
+            f'<div class="group-buttons">'
+        )
         for tid in group_tids:
             theme = theme_map[tid]
             accent = theme.get("colors", {}).get("accent", "#333")
@@ -1513,7 +1796,7 @@ def generate_gallery(rendered_map: dict, theme_map: dict,
                 f'{name}{rec_label}</button>'
             )
             btn_index += 1
-        buttons_html += '</div>\n'
+        buttons_html += '</div></section>\n'
 
     # 生成 THEME_PREVIEWS
     previews_html = ""
@@ -1531,12 +1814,16 @@ def generate_gallery(rendered_map: dict, theme_map: dict,
         .replace("{{THEME_BUTTONS}}", buttons_html)
         .replace("{{THEME_PREVIEWS}}", previews_html)
         .replace("{{DEFAULT_THEME}}", default_theme)
+        .replace("{{DEFAULT_STYLE_JSON}}", json.dumps(build_style_selection(default_theme), ensure_ascii=False))
+        .replace("{{MINIMAL_THEME_ID}}", MINIMAL_FLEX_THEME_ID)
+        .replace("{{MINIMAL_BASE_ACCENT}}", MINIMAL_FLEX_BASE_ACCENT)
+        .replace("{{MINIMAL_ACCENTS_JSON}}", json.dumps(MINIMAL_FLEX_ACCENTS, ensure_ascii=False))
     )
 
-    # 写入选中主题到临时文件（默认第一个）
-    tmp_dir = Path("/tmp/wechat-format")
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-    (tmp_dir / "selected-theme.txt").write_text(default_theme, encoding="utf-8")
+    # 写入默认选择结果，后续可由 gallery 服务更新。
+    write_selected_style(build_style_selection(default_theme), SELECTION_DIR)
+
+    write_selected_style(build_style_selection(default_theme), SELECTION_DIR)
 
     output_path = output_dir / "gallery.html"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1546,7 +1833,9 @@ def generate_gallery(rendered_map: dict, theme_map: dict,
 
 def format_for_output(content: str, input_path: Path, theme: dict,
                       output_dir: Path, vault_root: Path,
-                      output_format: str = "wechat") -> dict:
+                      output_format: str = "wechat",
+                      theme_name: str | None = None,
+                      selection: dict | None = None) -> dict:
     """统一格式化入口，支持多种输出格式
 
     Args:
@@ -1557,6 +1846,9 @@ def format_for_output(content: str, input_path: Path, theme: dict,
     Returns:
         dict with keys: html, footnote_html, title, word_count
     """
+    if theme_name:
+        theme = apply_theme_variants(theme_name, theme, selection)
+
     title = extract_title(content, input_path)
     word_count = count_words(content)
 
@@ -1615,33 +1907,63 @@ def format_for_output(content: str, input_path: Path, theme: dict,
 # ── 主流程 ──────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="微信公众号文章排版工具")
-    parser.add_argument("--input", "-i", required=True, help="输入 Markdown 文件路径")
+    parser.add_argument("--input", "-i", help="输入 Markdown 文件路径")
     parser.add_argument("--theme", "-t", default=DEFAULT_THEME, help=f"主题名称（默认: {DEFAULT_THEME}）")
+    parser.add_argument("--accent", choices=list(MINIMAL_FLEX_ACCENTS.keys()),
+                        help=f"极简可调主题的强调色（仅 {MINIMAL_FLEX_THEME_ID} 可用）")
+    parser.add_argument("--heading-align", choices=MINIMAL_FLEX_ALIGNS,
+                        help=f"极简可调主题的标题对齐（仅 {MINIMAL_FLEX_THEME_ID} 可用）")
+    parser.add_argument("--divider-style", choices=MINIMAL_FLEX_DIVIDERS,
+                        help=f"极简可调主题的分隔线样式（仅 {MINIMAL_FLEX_THEME_ID} 可用）")
     parser.add_argument("--vault-root", default=str(VAULT_ROOT), help="Obsidian Vault 根目录")
-    parser.add_argument("--output", "-o", default=str(OUTPUT_DIR), help="输出目录")
+    parser.add_argument("--output", "-o", default=None, help="输出目录（默认: 当前 Markdown 同级的 wechat output/）")
     parser.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
     parser.add_argument("--gallery", action="store_true", help="主题画廊模式：预览多个主题供选择")
     parser.add_argument("--recommend", nargs="*", default=[], help="推荐的主题ID列表（gallery中高亮显示）")
     parser.add_argument("--format", choices=["wechat", "html", "plain"], default="wechat",
                         help="输出格式: wechat(默认), html(标准HTML), plain(纯HTML)")
+    parser.add_argument("--serve-gallery-dir", help=argparse.SUPPRESS)
+    parser.add_argument("--serve-gallery-port", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--serve-selection-dir", help=argparse.SUPPRESS)
+    parser.add_argument("--serve-idle-timeout", type=int, default=1800, help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    input_path = Path(args.input)
-    vault_root = Path(args.vault_root)
-    output_base = Path(args.output)
-    theme_name = args.theme
+    if args.serve_gallery_dir:
+        run_gallery_server(
+            Path(args.serve_gallery_dir),
+            args.serve_gallery_port or 8765,
+            Path(args.serve_selection_dir or SELECTION_DIR),
+            args.serve_idle_timeout,
+        )
+        return
+    if not args.input:
+        parser.error("--input 是必填参数")
 
-    # 每篇文章一个子目录: 公众号排版/2026-02-26-文章名/
-    file_stem = re.sub(r"-(公众号|小红书|微博)$", "", input_path.stem)
-    output_dir = output_base / file_stem
+    input_path = Path(args.input).resolve()
+    vault_root = Path(args.vault_root)
+    output_dir = resolve_output_dir(input_path, args.output)
+    theme_name = args.theme
 
     # 验证输入文件
     if not input_path.exists():
         print(f"错误: 文件不存在 - {input_path}")
         sys.exit(1)
 
+    try:
+        selection = build_style_selection(
+            theme_name,
+            args.accent,
+            args.heading_align,
+            args.divider_style,
+            DEFAULT_FONT_SIZE,
+        )
+    except ValueError as exc:
+        print(f"错误: {exc}")
+        sys.exit(1)
+
     # 加载主题
     theme = load_theme(theme_name)
+    theme = apply_theme_variants(theme_name, theme, selection)
 
     print(f"主题: {theme['name']} ({theme_name})")
     print(f"输入: {input_path}")
@@ -1655,6 +1977,7 @@ def main():
 
     # 非微信格式：简单输出
     if args.format != "wechat":
+        write_selected_style(selection, SELECTION_DIR)
         result = format_for_output(content, input_path, theme, output_dir, vault_root, args.format)
         out_path = output_dir / f"article.{args.format}.html"
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1712,24 +2035,36 @@ def main():
             for future in as_completed(futures):
                 tid, rendered = future.result()
                 rendered_map[tid] = rendered
-                print(f"  ✓ {theme_map[tid].get('name', tid)} ({tid})")
+                print(f"  [ok] {theme_map[tid].get('name', tid)} ({tid})")
 
         gallery_path = generate_gallery(
             rendered_map, theme_map, gallery_theme_ids,
             title, word_count, output_dir,
             recommended=args.recommend
         )
-        print(f"\n画廊页面: {gallery_path}")
+        gallery_url = None
+        try:
+            gallery_url = start_gallery_server(output_dir, SELECTION_DIR)
+        except RuntimeError as exc:
+            print(f"\n警告: 本地 gallery 服务启动失败，将回退到文件预览: {exc}")
+        open_target = gallery_url or gallery_path.resolve().as_uri()
+        print(f"\n输出目录: {output_dir.resolve()}")
+        print(f"画廊文件: {gallery_path.resolve()}")
+        if gallery_url:
+            print(f"画廊页面: {gallery_url}")
+        else:
+            print(f"画廊页面: {gallery_path.resolve().as_uri()}")
 
         if AUTO_OPEN and not args.no_open:
-            webbrowser.open(f"file://{gallery_path}")
+            webbrowser.open(open_target)
             print("已在浏览器中打开画廊")
 
-        print(f"\n完成! 选中主题后点「用这个风格排版」即可复制到剪贴板。")
-        print(f"选中的主题 ID 会写入 /tmp/wechat-format/selected-theme.txt")
+        print(f"\n完成! 复制按钮会直接带走当前样式，不需要先点保存。")
+        print(f"当前选择会写入 {STYLE_SELECTION_FILE} 和 {THEME_SELECTION_FILE}")
         return
 
     # ── 单主题模式 ──
+    write_selected_style(selection, SELECTION_DIR)
     html = inject_inline_styles(html, theme)
     if footnote_html:
         footnote_html = inject_inline_styles(footnote_html, theme, skip_wrapper=True)
@@ -1748,10 +2083,12 @@ def main():
     # 保存预览 HTML
     preview_path = output_dir / "preview.html"
     generate_preview(html, footnote_html, theme, title, word_count, preview_path)
-    print(f"\n排版成品: {preview_path}")
+    print(f"\n输出目录: {output_dir.resolve()}")
+    print(f"排版成品: {preview_path.resolve()}")
+    print(f"预览地址: {preview_path.resolve().as_uri()}")
 
     if AUTO_OPEN and not args.no_open:
-        webbrowser.open(f"file://{preview_path}")
+        webbrowser.open(preview_path.resolve().as_uri())
         print("已在浏览器中打开预览")
 
     print("\n完成! 在浏览器中点击「复制到微信」按钮，然后粘贴到公众号后台即可。")

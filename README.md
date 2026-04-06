@@ -1,6 +1,8 @@
 # xiaohu-wechat-format
 
-A Claude Code skill for the full WeChat Official Account (公众号) publishing pipeline: **Format** → **Cover** (optional) → **Publish** — with 30 themes, a visual gallery picker, AI content enhancement, and one-click publishing to drafts.
+A WeChat Official Account formatting toolkit for **Claude**, **Codex**, and direct CLI use.
+
+It turns Markdown into WeChat-compatible inline HTML, opens a browser gallery for theme selection, supports adjustable minimal styling, and can optionally publish to WeChat drafts.
 
 **[中文说明](README_CN.md)**
 
@@ -8,102 +10,36 @@ A Claude Code skill for the full WeChat Official Account (公众号) publishing 
 
 ## What It Does
 
-1. **Markdown → WeChat HTML**: Converts standard Markdown into inline-styled HTML that works in WeChat's editor (no `<style>` tags, no classes — everything inline)
-2. **30 Themes**: From newspaper-style serif to neon cyberpunk, organized into 5 categories
-3. **Visual Gallery**: Preview 20 core themes with your actual article in a browser, then pick one
-4. **AI Content Enhancement**: Auto-detects dialogue, key quotes, and image sequences — wraps them in styled containers
-5. **One-Click Publish**: Uploads images to WeChat CDN and pushes the article to your drafts
+1. Markdown -> WeChat HTML with inline styles.
+2. Theme gallery based on your real article.
+3. A new adjustable minimal theme: `minimal-flex`.
+4. Structured style persistence via `selected-theme.txt` and `selected-style.json`.
+5. Optional publish flow for WeChat drafts.
 
-![Bytedance Theme](docs/gallery-bytedance.png)
+## Install
 
-## Quick Start
+### Claude
 
 ```bash
-# Install
 cd ~/.claude/skills/
 git clone https://github.com/xiaohuailabs/xiaohu-wechat-format.git
 cp xiaohu-wechat-format/config.example.json xiaohu-wechat-format/config.json
 pip3 install markdown requests
-
-# Format an article (opens gallery in browser)
-python3 scripts/format.py --input article.md --gallery
-
-# Format with a specific theme
-python3 scripts/format.py --input article.md --theme newspaper
-
-# Publish to WeChat drafts
-python3 scripts/publish.py --dir /tmp/wechat-format/article-name/ --cover cover.jpg
 ```
 
-## Using with Claude Code
+### Codex / CLI
 
-Just say:
-
+```bash
+git clone https://github.com/xiaohuailabs/xiaohu-wechat-format.git
+cd xiaohu-wechat-format
+cp config.example.json config.json
+pip3 install markdown requests
 ```
-排版这篇文章 /path/to/article.md
-```
 
-Claude will:
-1. Read and analyze your article
-2. Auto-enhance content (add dialogue containers, callout blocks, etc.)
-3. Open the theme gallery in your browser
-4. You pick a theme, tell Claude the name
-5. Claude formats and optionally publishes to WeChat
+Codex can use this repo in two ways:
 
-## Themes (30)
-
-### Standalone Styles (9)
-
-| Theme | ID | Style |
-|-------|-----|-------|
-| Terracotta | `terracotta` | Warm orange, rounded headers |
-| ByteDance | `bytedance` | Blue-teal gradient, modern tech |
-| Chinese | `chinese` | Vermillion red, classical |
-| Newspaper | `newspaper` | NYT-style serif, serious |
-| GitHub | `github` | Developer-friendly, light code blocks |
-| SSPAI | `sspai` | Chinese tech media red |
-| Bauhaus | `bauhaus` | Primary colors, geometric |
-| Ink | `ink` | Pure black, minimal whitespace |
-| Midnight | `midnight` | Dark background, neon accents |
-
-### Curated Styles (7)
-
-| Theme | ID | Style |
-|-------|-----|-------|
-| Sports | `sports` | Gradient stripes, energetic |
-| Mint | `mint-fresh` | Mint green, fresh |
-| Sunset | `sunset-amber` | Warm amber tones |
-| Lavender | `lavender-dream` | Purple dreamy |
-| Coffee | `coffee-house` | Brown warm tones |
-| WeChat Native | `wechat-native` | WeChat green |
-| Magazine | `magazine` | Extra whitespace, editorial |
-
-### Template Series (14)
-
-4 layouts (Minimal / Focus / Elegant / Bold) × multiple color variants (Gold / Blue / Red / Green / Navy / Gray)
-
-## Container Syntax
-
-Enhance your Markdown with these containers before formatting:
-
-```markdown
-:::dialogue[Interview Title]
-Alice: Hello there
-Bob: Hi, how are you?
-:::
-
-:::gallery[Screenshots]
-![](img1.jpg)
-![](img2.jpg)
-![](img3.jpg)
-:::
-
-> [!important] Key Insight
-> This is the important takeaway
-
-> [!tip] Pro Tip
-> A useful tip for readers
-```
+1. Clone the repo into the current workspace and run the scripts directly.
+2. Give Codex the repo URL or local path and ask it to call `scripts/format.py` or `scripts/publish.py`.
 
 ## Configuration
 
@@ -111,7 +47,7 @@ Edit `config.json`:
 
 ```json
 {
-  "output_dir": "/tmp/wechat-format",
+  "output_dir": "./wechat-output-cache",
   "vault_root": "/path/to/your/obsidian/vault",
   "settings": {
     "default_theme": "newspaper",
@@ -129,34 +65,123 @@ Edit `config.json`:
 }
 ```
 
-- `wechat` section is only needed for publishing; formatting works without it
-- `cover` section is only needed for cover image generation
-- Get AppID/AppSecret from: WeChat Official Account Admin → Settings → Basic Configuration
-- **Important**: Add your public IP to the WeChat IP whitelist, otherwise API calls will fail with error 40164
+- Normal formatting now writes to a new `wechat output/` folder next to the source Markdown file.
+- `output_dir` is kept as a legacy fallback for older flows.
+- `wechat` is only required for publishing.
+- `cover` is only required for cover generation.
 
-## Cover Image Generation
+## Format an Article
 
-This repo includes a complete cover image generator in `cover/`. It calls the Gemini Image API (or compatible third-party gateways) to produce WeChat cover images (2.35:1 ratio, Notion illustration style).
+### Open the Gallery
 
-### Setup
-
-1. Copy `cover/config.example.json` → `cover/config.json`
-2. Fill in your API credentials:
-
-```json
-{
-  "output_dir": "~/Documents/covers",
-  "settings": {
-    "base_url": "https://YOUR_PROVIDER/v1",
-    "model": "gemini-3-pro-image-preview"
-  },
-  "secrets": {
-    "api_key": "YOUR_API_KEY"
-  }
-}
+```bash
+python3 scripts/format.py --input article.md --gallery
 ```
 
-3. Generate a cover:
+Default output:
+
+```text
+article.md
+wechat output/
+  gallery.html
+  article.html
+  preview.html
+  images/
+```
+
+The browser page is only for preview and picking a style. After copying into WeChat, you can still fine-tune text manually in the editor.
+
+### Format Directly
+
+```bash
+python3 scripts/format.py --input article.md --theme newspaper
+```
+
+### Adjustable Minimal Theme
+
+```bash
+python3 scripts/format.py \
+  --input article.md \
+  --theme minimal-flex \
+  --accent blue \
+  --heading-align center \
+  --divider-style solid-short
+```
+
+Available `minimal-flex` options:
+
+- `--accent`: `gray`, `blue`, `green`, `red`, `navy`, `gold`
+- `--heading-align`: `left`, `center`, `right`
+- `--divider-style`: `solid-full`, `solid-short`, `none`
+
+All heading levels from `#` to `#####` follow the alignment option.
+
+## Style Selection Files
+
+Gallery selections are written to the system temp directory:
+
+- Windows example: `%TEMP%\wechat-format\selected-theme.txt`
+- Windows example: `%TEMP%\wechat-format\selected-style.json`
+- macOS / Linux example: `/tmp/wechat-format/selected-theme.txt`
+- macOS / Linux example: `/tmp/wechat-format/selected-style.json`
+
+`selected-style.json` is preferred. `selected-theme.txt` is kept for backward compatibility.
+
+## Publish to WeChat Drafts
+
+```bash
+python3 scripts/publish.py --dir "/path/to/article-folder/wechat output" --cover cover.jpg
+```
+
+Or one-step input -> format -> publish:
+
+```bash
+python3 scripts/publish.py --input article.md
+```
+
+With `minimal-flex`:
+
+```bash
+python3 scripts/publish.py \
+  --input article.md \
+  --theme minimal-flex \
+  --accent green \
+  --heading-align right \
+  --divider-style none
+```
+
+## Windows Notes
+
+- Do not rely on `/tmp/...` paths on Windows.
+- `format.py --gallery` now prints both the real output folder and a local `http://127.0.0.1:.../gallery.html` address.
+- Single-theme preview now prints an exact `file:///.../preview.html` URI.
+- If the local gallery server cannot start, the script falls back to opening the generated `gallery.html` file directly.
+
+## Theme Notes
+
+- Existing theme IDs stay compatible.
+- Gallery now shows a curated `极简 / minimal-flex` entry instead of listing several minimal child themes separately.
+- Older `minimal-*` themes are still available for direct CLI use.
+
+## Container Syntax
+
+```markdown
+:::dialogue[Interview Title]
+Alice: Hello there
+Bob: Hi, how are you?
+:::
+
+:::gallery[Screenshots]
+![](img1.jpg)
+![](img2.jpg)
+![](img3.jpg)
+:::
+
+> [!important] Key Insight
+> This is the important takeaway
+```
+
+## Cover Workflow
 
 ```bash
 python3 scripts/generate.py \
@@ -165,28 +190,13 @@ python3 scripts/generate.py \
   --out cover.jpg
 ```
 
-Or with Claude Code, just say: `给这篇文章配个封面`
-
-See `cover/SKILL.md` for the full prompt template and workflow details.
-
-## How WeChat Compatibility Works
-
-WeChat's editor strips `<style>` tags and CSS classes. This tool:
-
-- **CJK spacing fix**: Auto-adds spaces between Chinese and English/numbers
-- **Bold punctuation fix**: Moves Chinese punctuation outside bold markers (`**text，**` → `**text**，`)
-- Writes all styles as inline `style="..."` attributes on every element
-- Converts `<ul>/<ol>` to `<section>` + flexbox (WeChat mangles native lists)
-- Transforms external links `[text](url)` into footnotes (WeChat blocks external links)
-- Processes `![[image.jpg]]` Obsidian wiki-links and standard `![](image)` references
-- Renders callout blocks (`[!tip]`, `[!important]`, `[!warning]`) with distinct colors
-- Converts dialogue blocks into chat-bubble layouts
+See `cover/SKILL.md` for the cover workflow.
 
 ## Requirements
 
 - Python 3
-- `markdown` library
-- `requests` library (for publishing)
+- `markdown`
+- `requests` for publishing
 
 ## License
 

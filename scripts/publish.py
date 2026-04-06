@@ -33,6 +33,13 @@ SKILL_DIR = SCRIPT_DIR.parent
 
 with open(SKILL_DIR / "config.json", encoding="utf-8") as f:
     CONFIG = json.load(f)
+SELECTION_DIR = Path(tempfile.gettempdir()) / "wechat-format"
+STYLE_SELECTION_FILE = SELECTION_DIR / "selected-style.json"
+
+
+def resolve_output_dir(input_path: Path) -> Path:
+    """默认发布 format.py 在文章同级目录生成的 wechat output。"""
+    return input_path.parent / "wechat output"
 
 
 # ── 微信 API ─────────────────────────────────────────────────────────
@@ -61,9 +68,9 @@ def get_access_token():
         errmsg = data.get("errmsg", "未知错误")
         print(f"错误: 获取 access_token 失败 (errcode={errcode}: {errmsg})")
         if errcode == 40164:
-            print("  → IP 不在白名单中，请到公众号后台添加当前 IP")
+            print("  [hint] IP 不在白名单中，请到公众号后台添加当前 IP")
         elif errcode in (40001, 40125):
-            print("  → AppSecret 无效，请检查 config.json 中的 app_secret")
+            print("  [hint] AppSecret 无效，请检查 config.json 中的 app_secret")
         sys.exit(1)
 
 
@@ -119,14 +126,14 @@ def upload_content_image(token, image_path, max_retries=3):
             if "url" in data:
                 return data["url"]
             else:
-                print(f"  ✗ 上传失败 ({attempt}/{max_retries}) - {filename}: {data}")
+                print(f"  [fail] 上传失败 ({attempt}/{max_retries}) - {filename}: {data}")
         except Exception as e:
-            print(f"  ✗ 上传异常 ({attempt}/{max_retries}) - {filename}: {e}")
+            print(f"  [fail] 上传异常 ({attempt}/{max_retries}) - {filename}: {e}")
 
         if attempt < max_retries:
             time.sleep(2 * attempt)  # 递增等待
 
-    print(f"  ✗ 上传彻底失败 - {filename}")
+    print(f"  [fail] 上传彻底失败 - {filename}")
     return None
 
 
@@ -156,7 +163,7 @@ def download_external_image(url):
         tmp.close()
         return tmp.name
     except Exception as e:
-        print(f"  ✗ 下载失败: {url[:60]}... ({e})")
+        print(f"  [fail] 下载失败: {url[:60]}... ({e})")
         return None
 
 
@@ -182,7 +189,7 @@ def replace_all_images(html, article_dir, token):
                 os.unlink(local_path)  # 清理临时文件
                 if cdn_url:
                     replaced += 1
-                    print(f"  ✓ 外部图片: {src[:60]}...")
+                    print(f"  [ok] 外部图片: {src[:60]}...")
                     return f'src="{cdn_url}"'
             failed += 1
             return match.group(0)
@@ -196,13 +203,13 @@ def replace_all_images(html, article_dir, token):
             cdn_url = upload_content_image(token, str(local_path))
             if cdn_url:
                 replaced += 1
-                print(f"  ✓ {os.path.basename(src)}")
+                print(f"  [ok] {os.path.basename(src)}")
                 return f'src="{cdn_url}"'
             else:
                 failed += 1
                 return match.group(0)
         else:
-            print(f"  ✗ 未找到: {src}")
+            print(f"  [fail] 未找到: {src}")
             failed += 1
             return match.group(0)
 
@@ -281,6 +288,16 @@ def find_cover_image(article_dir, cover_arg=None):
     return None
 
 
+def load_selected_style(selection_file: Path = STYLE_SELECTION_FILE) -> dict | None:
+    """读取 gallery 保存的结构化样式选择结果。"""
+    if not selection_file.exists():
+        return None
+    try:
+        return json.loads(selection_file.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
 # ── 主流程 ────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="微信公众号草稿箱发布工具")
@@ -291,6 +308,12 @@ def main():
     parser.add_argument("--title", "-t", help="文章标题（默认从 HTML 提取）")
     parser.add_argument("--theme", default=None,
                         help="排版主题（仅 --input 模式有效，默认读取 gallery 选中的主题）")
+    parser.add_argument("--accent", choices=["gray", "blue", "green", "red", "navy", "gold"],
+                        help="极简可调主题的强调色（仅 --input 模式有效）")
+    parser.add_argument("--heading-align", choices=["left", "center", "right"],
+                        help="极简可调主题的标题对齐（仅 --input 模式有效）")
+    parser.add_argument("--divider-style", choices=["solid-full", "solid-short", "none"],
+                        help="极简可调主题的分隔线样式（仅 --input 模式有效）")
     parser.add_argument("--author", "-a",
                         default=CONFIG.get("wechat", {}).get("author", ""),
                         help="作者名")
@@ -300,10 +323,27 @@ def main():
 
     # ── 1. 确定文章目录 ──────────────────────────────────────────────
     if args.input:
-        # 确定主题：优先命令行指定 > gallery 选中 > 默认
+        # 确定样式：优先命令行指定 > gallery 结构化选择 > 旧版主题文件 > 默认
+        selected_style = load_selected_style()
         theme = args.theme
+        accent = args.accent
+        heading_align = args.heading_align
+        divider_style = args.divider_style
+
+        if selected_style:
+            if not theme:
+                theme = selected_style.get("theme_id")
+            if theme == selected_style.get("theme_id") and not accent:
+                accent = selected_style.get("accent")
+            if theme == selected_style.get("theme_id") and not heading_align:
+                heading_align = selected_style.get("heading_align")
+            if theme == selected_style.get("theme_id") and not divider_style:
+                divider_style = selected_style.get("divider_style")
+            if theme:
+                print(f"  使用已保存的样式选择: {theme}")
+
         if not theme:
-            gallery_theme_file = Path("/tmp/wechat-format/selected-theme.txt")
+            gallery_theme_file = SELECTION_DIR / "selected-theme.txt"
             if gallery_theme_file.exists():
                 saved = gallery_theme_file.read_text(encoding="utf-8").strip()
                 if saved:
@@ -321,6 +361,12 @@ def main():
             "--theme", theme,
             "--no-open",
         ]
+        if accent:
+            format_cmd.extend(["--accent", accent])
+        if heading_align:
+            format_cmd.extend(["--heading-align", heading_align])
+        if divider_style:
+            format_cmd.extend(["--divider-style", divider_style])
         result = subprocess.run(format_cmd, capture_output=True, text=True)
         if result.returncode != 0:
             print(f"排版失败:\n{result.stderr}")
@@ -328,9 +374,14 @@ def main():
         print(result.stdout)
 
         # 从 format.py 输出中找到目录
-        output_base = Path(CONFIG["output_dir"])
-        file_stem = re.sub(r"-(公众号|小红书|微博)$", "", input_path.stem)
-        article_dir = output_base / file_stem
+        article_dir = resolve_output_dir(input_path)
+        if not article_dir.exists():
+            # 兼容旧版全局输出目录
+            legacy_output_base = Path(CONFIG["output_dir"])
+            file_stem = re.sub(r"-(公众号|小红书|微博)$", "", input_path.stem)
+            legacy_dir = legacy_output_base / file_stem
+            if legacy_dir.exists():
+                article_dir = legacy_dir
     else:
         article_dir = Path(args.dir)
 
@@ -372,7 +423,7 @@ def main():
     # ── 4. 获取 token ────────────────────────────────────────────────
     print(f"\n获取 access_token...")
     token = get_access_token()
-    print("✓ token 获取成功")
+    print("[ok] token 获取成功")
 
     # ── 5. 上传正文图片 ──────────────────────────────────────────────
     # 统计图片数量（本地 + 外部）
@@ -405,9 +456,9 @@ def main():
         print(f"\n上传封面图: {cover_path.name}")
         thumb_media_id = upload_thumb_image(token, str(cover_path))
         if thumb_media_id:
-            print(f"  ✓ media_id: {thumb_media_id[:20]}...")
+            print(f"  [ok] media_id: {thumb_media_id[:20]}...")
         else:
-            print("  ✗ 封面上传失败")
+            print("  [fail] 封面上传失败")
             thumb_media_id = None
     else:
         print("\n未找到封面图")
@@ -433,7 +484,7 @@ def main():
         print(f"\n{'='*40}")
         print(f"  发布成功!")
         print(f"  草稿 media_id: {media_id}")
-        print(f"  → 请到微信公众号后台 → 草稿箱 查看和发布")
+        print("  [hint] 请到微信公众号后台 -> 草稿箱 查看和发布")
         print(f"{'='*40}")
     else:
         print(f"\n发布失败")

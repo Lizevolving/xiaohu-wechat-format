@@ -8,329 +8,673 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    background: #f5f5f7;
+    background:
+        radial-gradient(circle at top left, rgba(7,193,96,0.08), transparent 28%),
+        radial-gradient(circle at top right, rgba(17,24,39,0.06), transparent 24%),
+        linear-gradient(180deg, #f6f7f9 0%, #eef1f4 100%);
+    color: #111827;
     min-height: 100vh;
 }
-
-/* ── Toolbar ── */
 .toolbar {
-    position: fixed;
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
-    background: rgba(255,255,255,0.92);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-bottom: 1px solid #e0e0e0;
-    padding: 14px 24px;
+    z-index: 200;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    background: rgba(255,255,255,0.82);
+    border-bottom: 1px solid rgba(17,24,39,0.08);
+}
+.toolbar-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 16px 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    z-index: 200;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-}
-.toolbar-left {
-    display: flex;
-    align-items: center;
     gap: 16px;
 }
 .toolbar-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #1d1d1f;
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
 }
 .toolbar-meta {
+    margin-top: 4px;
     font-size: 13px;
-    color: #86868b;
+    color: #6b7280;
 }
 .toolbar-hint {
     font-size: 13px;
     color: #07c160;
-    font-weight: 500;
+    font-weight: 600;
+    white-space: nowrap;
 }
-
-/* ── Main Container ── */
 .main-container {
-    max-width: 700px;
-    margin: 80px auto 40px;
-    padding: 0 20px;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+    display: grid;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+.control-stack {
+    position: sticky;
+    top: 92px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 24px;
+    gap: 16px;
 }
-
-/* ── Theme Buttons ── */
-.theme-buttons {
+.panel {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid rgba(17,24,39,0.08);
+    border-radius: 20px;
+    box-shadow: 0 16px 40px rgba(15,23,42,0.08);
+    padding: 18px;
+}
+.panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 4px;
+}
+.panel-desc {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.6;
+    margin-bottom: 14px;
+}
+.font-size-selector {
     display: flex;
+    align-items: center;
+    gap: 8px;
     flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-    max-width: 600px;
 }
-.theme-group {
+.chip-label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 600;
+}
+.chip-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    align-items: center;
-    margin-bottom: 8px;
+}
+.chip-btn,
+.theme-btn,
+.action-btn {
+    font-family: inherit;
+}
+.chip-btn {
+    border: 1px solid rgba(17,24,39,0.12);
+    background: #fff;
+    color: #374151;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+.chip-btn:hover {
+    border-color: rgba(7,193,96,0.4);
+    color: #111827;
+}
+.chip-btn.active {
+    background: rgba(7,193,96,0.12);
+    border-color: rgba(7,193,96,0.24);
+    color: #067647;
+}
+.theme-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.theme-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
 }
 .group-label {
     font-size: 12px;
-    color: #86868b;
-    font-weight: 600;
-    min-width: 60px;
-    letter-spacing: 0.5px;
+    font-weight: 700;
+    color: #6b7280;
+    letter-spacing: 0.04em;
+    line-height: 1;
+}
+.group-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 .theme-btn {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
+    gap: 8px;
+    padding: 8px 14px;
     background: #fff;
-    border: 2px solid #e0e0e0;
-    border-radius: 20px;
+    border: 1px solid rgba(17,24,39,0.1);
+    border-radius: 999px;
     font-size: 13px;
-    font-weight: 500;
-    color: #333;
+    font-weight: 600;
+    color: #374151;
     cursor: pointer;
-    transition: all 0.2s;
-    font-family: inherit;
-}
-.theme-btn:hover {
-    border-color: #ccc;
-    background: #fafafa;
-}
-.theme-btn.active {
-    border-color: #07c160;
-    background: rgba(7,193,96,0.06);
-    color: #07c160;
-}
-.theme-btn.recommended {
+    transition: all 0.18s ease;
     position: relative;
 }
-.theme-btn.recommended .rec-badge {
-    position: absolute;
-    top: -8px;
-    right: -6px;
-    background: #ff9500;
-    color: #fff;
-    font-size: 10px;
-    line-height: 1;
-    padding: 2px 5px;
-    border-radius: 6px;
-    font-weight: 600;
-    pointer-events: none;
+.theme-btn:hover {
+    transform: translateY(-1px);
+    border-color: rgba(17,24,39,0.18);
+    box-shadow: 0 8px 18px rgba(15,23,42,0.08);
+}
+.theme-btn.active {
+    border-color: rgba(7,193,96,0.32);
+    background: rgba(7,193,96,0.1);
+    color: #067647;
+    box-shadow: 0 10px 22px rgba(7,193,96,0.12);
 }
 .theme-dot {
-    display: inline-block;
     width: 10px;
     height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
 }
-
-/* ── Phone Frame Preview ── */
-.phone-frame {
-    width: 100%;
-    max-width: 415px;
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.12);
-    overflow: hidden;
+.theme-btn.recommended .rec-badge {
+    position: absolute;
+    top: -8px;
+    right: -2px;
+    background: #ff8a00;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 999px;
+    line-height: 1.1;
 }
-.phone-header {
-    background: #ededed;
-    padding: 12px 16px;
+.variant-panel {
+    display: none;
+}
+.variant-panel.is-visible {
+    display: block;
+}
+.variant-block + .variant-block {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(17,24,39,0.1);
+}
+.color-grid {
     display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.color-chip {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    color: #999;
-    border-bottom: 1px solid #e0e0e0;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(17,24,39,0.12);
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    transition: all 0.18s ease;
 }
-.preview-scroll {
-    max-height: 600px;
-    overflow-y: auto;
-    padding: 20px;
+.color-chip:hover {
+    border-color: rgba(17,24,39,0.2);
 }
-.theme-preview {
-    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+.color-chip.active {
+    border-color: rgba(17,24,39,0.24);
+    box-shadow: 0 8px 18px rgba(15,23,42,0.08);
 }
-
-/* ── Color Variants (placeholder) ── */
-.color-hint {
-    font-size: 13px;
-    color: #999;
-    text-align: center;
+.color-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }
-
-/* ── Action Button ── */
+.action-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
 .action-btn {
     width: 100%;
-    max-width: 415px;
-    padding: 14px 0;
+    padding: 13px 16px;
+    border: none;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    letter-spacing: 0.02em;
+}
+.action-btn:hover {
+    transform: translateY(-1px);
+}
+.action-btn.primary {
     background: #07c160;
     color: #fff;
-    border: none;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    letter-spacing: 0.5px;
-    font-family: inherit;
+    box-shadow: 0 12px 24px rgba(7,193,96,0.22);
 }
-.action-btn:hover { background: #06ae56; }
-.action-btn:active { transform: scale(0.99); }
+.action-btn.primary:hover {
+    background: #06ae56;
+}
+.action-btn.secondary {
+    background: #fff;
+    color: #374151;
+    border: 1px solid rgba(17,24,39,0.1);
+    box-shadow: 0 10px 20px rgba(15,23,42,0.06);
+}
+.action-btn.secondary:hover {
+    background: #f9fafb;
+}
 .action-btn.copied {
     background: #34c759;
-}
-
-/* ── Font Size Selector ── */
-.font-size-selector {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-bottom: 16px;
-    padding: 8px 0;
-}
-.fs-label {
-    font-size: 13px;
-    color: #999;
-}
-.fs-btn {
-    padding: 4px 12px;
-    border: 1px solid #ddd;
-    border-radius: 16px;
-    background: #fff;
-    font-size: 13px;
-    color: #666;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: inherit;
-}
-.fs-btn:hover {
-    border-color: #07C160;
-    color: #07C160;
-}
-.fs-btn.active {
-    background: #07C160;
-    border-color: #07C160;
     color: #fff;
 }
-
-/* ── Responsive ── */
-@media (max-width: 600px) {
-    .toolbar { padding: 10px 14px; }
-    .toolbar-hint { display: none; }
+.preview-stage {
+    min-width: 0;
+}
+.preview-card {
+    background: rgba(255,255,255,0.92);
+    border: 1px solid rgba(17,24,39,0.08);
+    border-radius: 28px;
+    box-shadow: 0 20px 50px rgba(15,23,42,0.1);
+    overflow: hidden;
+}
+.preview-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(17,24,39,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(249,250,251,0.9) 100%);
+}
+.preview-device {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 700;
+}
+.preview-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #d1d5db;
+}
+.preview-title {
+    font-size: 13px;
+    color: #6b7280;
+    font-weight: 600;
+}
+.preview-scroll {
+    max-height: 780px;
+    overflow-y: auto;
+    padding: 18px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(249,250,251,0.88) 100%);
+}
+.theme-preview {
+    display: none;
+    min-height: 520px;
+}
+.theme-preview.active {
+    display: block;
+}
+@media (max-width: 980px) {
     .main-container {
-        margin-top: 68px;
-        padding: 0 12px;
+        grid-template-columns: 1fr;
     }
-    .theme-buttons {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        width: 100%;
+    .control-stack {
+        position: static;
     }
-    .theme-btn {
-        justify-content: center;
+}
+@media (max-width: 640px) {
+    .toolbar-inner,
+    .main-container {
+        padding-left: 14px;
+        padding-right: 14px;
     }
-    .phone-frame {
-        border-radius: 0;
-        box-shadow: none;
+    .toolbar-inner {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+    .toolbar-hint {
+        white-space: normal;
+    }
+    .panel,
+    .preview-card {
+        border-radius: 18px;
+    }
+    .theme-group {
+        gap: 8px;
     }
     .preview-scroll {
-        max-height: 500px;
+        padding: 12px;
+        max-height: 66vh;
     }
 }
 </style>
 </head>
 <body>
 
-<!-- ── Toolbar ── -->
 <div class="toolbar">
-    <div class="toolbar-left">
-        <span class="toolbar-title">{{TITLE}}</span>
-        <span class="toolbar-meta">{{WORD_COUNT}} 字</span>
+    <div class="toolbar-inner">
+        <div>
+            <div class="toolbar-title">{{TITLE}}</div>
+            <div class="toolbar-meta">{{WORD_COUNT}} 字 · 这是排版预览稿，复制到公众号后台后仍可微调文字</div>
+        </div>
+        <div class="toolbar-hint">先选整体风格，再按需微调</div>
     </div>
-    <span class="toolbar-hint">选一个你喜欢的风格</span>
 </div>
 
-<!-- ── Main Content ── -->
 <div class="main-container">
+    <aside class="control-stack">
+        <section class="panel">
+            <div class="panel-title">基础设置</div>
+            <div class="panel-desc">先定字号和主题。画廊会实时切换到对应排版预览。</div>
+            <div class="font-size-selector">
+                <span class="chip-label">字号</span>
+                <div class="chip-row">
+                    <button class="chip-btn active" data-size="15" onclick="switchFontSize(15)">15px</button>
+                    <button class="chip-btn" data-size="16" onclick="switchFontSize(16)">16px</button>
+                </div>
+            </div>
+        </section>
 
-    <!-- Font Size Selector -->
-    <div class="font-size-selector">
-        <span class="fs-label">字号</span>
-        <button class="fs-btn active" data-size="15" onclick="switchFontSize(15)">15px</button>
-        <button class="fs-btn" data-size="16" onclick="switchFontSize(16)">16px</button>
-    </div>
-
-    <!-- Theme Buttons -->
-    <div class="theme-buttons">
+        <section class="panel">
+            <div class="panel-title">主题画廊</div>
+            <div class="panel-desc">这里只负责帮你选风格，不直接改原文。复制到公众号后台后，你仍然可以继续微调文字。</div>
+            <div class="theme-list">
 {{THEME_BUTTONS}}
-    </div>
+            </div>
+        </section>
 
-    <!-- Phone Frame Preview -->
-    <div class="phone-frame">
-        <div class="phone-header">微信公众号预览</div>
-        <div class="preview-scroll" id="previewScroll">
+        <section class="panel variant-panel" id="variantPanel">
+            <div class="panel-title">极简主题微调</div>
+            <div class="panel-desc">仅对“极简·可调”开放。颜色会同时作用于标题和加粗文字。</div>
+
+            <div class="variant-block">
+                <div class="chip-label" style="margin-bottom: 8px;">强调色</div>
+                <div class="color-grid" id="accentOptions"></div>
+            </div>
+
+            <div class="variant-block">
+                <div class="chip-label" style="margin-bottom: 8px;">标题对齐</div>
+                <div class="chip-row">
+                    <button class="chip-btn align-btn active" data-align="left" onclick="setHeadingAlign('left')">左对齐</button>
+                    <button class="chip-btn align-btn" data-align="center" onclick="setHeadingAlign('center')">居中</button>
+                    <button class="chip-btn align-btn" data-align="right" onclick="setHeadingAlign('right')">右对齐</button>
+                </div>
+            </div>
+
+            <div class="variant-block">
+                <div class="chip-label" style="margin-bottom: 8px;">分隔线</div>
+                <div class="chip-row">
+                    <button class="chip-btn divider-btn active" data-divider="solid-full" onclick="setDividerStyle('solid-full')">整行实线</button>
+                    <button class="chip-btn divider-btn" data-divider="solid-short" onclick="setDividerStyle('solid-short')">短实线</button>
+                    <button class="chip-btn divider-btn" data-divider="none" onclick="setDividerStyle('none')">不显示</button>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-title">操作</div>
+            <div class="panel-desc">复制按钮就能直接带走当前样式。保存当前选择只是可选项，用于后续继续发布。</div>
+            <div class="action-stack">
+                <button class="action-btn primary" id="copyBtn" onclick="copyCurrentPreview()">复制内容到公众号</button>
+                <button class="action-btn secondary" id="confirmBtn" onclick="confirmSelection()">保存当前选择（可选）</button>
+            </div>
+        </section>
+    </aside>
+
+    <main class="preview-stage">
+        <section class="preview-card">
+            <div class="preview-header">
+                <div class="preview-device">
+                    <span class="preview-dot"></span>
+                    <span class="preview-dot"></span>
+                    <span class="preview-dot"></span>
+                    <span>公众号预览</span>
+                </div>
+                <div class="preview-title" id="previewTitle">当前主题</div>
+            </div>
+            <div class="preview-scroll" id="previewScroll">
 {{THEME_PREVIEWS}}
-        </div>
-    </div>
-
-    <!-- Action Buttons -->
-    <button class="action-btn" id="confirmBtn" onclick="confirmAndCopy()">✓ 确认 — 回到 Claude 回复主题名 推送到公众号</button>
-    <button class="action-btn" id="copyBtn" onclick="applyTheme()" style="background:#86868b;margin-top:8px;">复制内容到剪贴板 去公众号粘贴</button>
-
+            </div>
+        </section>
+    </main>
 </div>
 
 <script>
-var selectedTheme = '{{DEFAULT_THEME}}';
+var MINIMAL_THEME_ID = '{{MINIMAL_THEME_ID}}';
+var MINIMAL_BASE_ACCENT = '{{MINIMAL_BASE_ACCENT}}';
+var MINIMAL_ACCENTS = {{MINIMAL_ACCENTS_JSON}};
+var DEFAULT_STYLE = {{DEFAULT_STYLE_JSON}};
+var selectedStyle = JSON.parse(JSON.stringify(DEFAULT_STYLE));
+var originalPreviewHtml = {};
+var minimalPrefs = {
+    accent: DEFAULT_STYLE.accent || 'gray',
+    heading_align: DEFAULT_STYLE.heading_align || 'left',
+    divider_style: DEFAULT_STYLE.divider_style || 'solid-full'
+};
+
+function renderAccentOptions() {
+    var container = document.getElementById('accentOptions');
+    var html = '';
+    Object.keys(MINIMAL_ACCENTS).forEach(function(key) {
+        var option = MINIMAL_ACCENTS[key];
+        html += '<button class="color-chip" data-accent="' + key + '" onclick="setAccent(\'' + key + '\')">' +
+            '<span class="color-swatch" style="background:' + option.hex + '"></span>' +
+            '<span>' + option.label + '</span>' +
+            '</button>';
+    });
+    container.innerHTML = html;
+}
+
+function persistSelection() {
+    try {
+        localStorage.setItem('wechat-format-style', JSON.stringify(selectedStyle));
+    } catch (e) {}
+
+    if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+        try {
+            fetch('/api/selection', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(selectedStyle)
+            }).catch(function() {});
+        } catch (e) {}
+    }
+}
+
+function updatePreviewTitle() {
+    var activeBtn = document.querySelector('.theme-btn.active');
+    document.getElementById('previewTitle').textContent = activeBtn ? activeBtn.textContent.replace('推荐', '').trim() : '当前主题';
+}
+
+function syncButtonState(selector, key, value) {
+    document.querySelectorAll(selector).forEach(function(btn) {
+        if (btn.dataset[key] === value) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+function applyFontSizeToContainer(container, size) {
+    if (!container) return;
+    container.querySelectorAll('p').forEach(function(p) {
+        var currentSize = parseInt(window.getComputedStyle(p).fontSize, 10);
+        if (currentSize >= 14 && currentSize <= 16) {
+            p.style.fontSize = size + 'px';
+            p.style.lineHeight = size === 16 ? '1.75' : '1.8';
+        }
+    });
+    container.querySelectorAll('[style*="font-size:15px"]').forEach(function(el) {
+        if (el.tagName === 'SPAN' || el.tagName === 'SECTION') {
+            el.style.fontSize = size + 'px';
+        }
+    });
+}
+
+function applyDividerStyle(preview, accentHex) {
+    preview.querySelectorAll('hr').forEach(function(hr) {
+        hr.style.border = 'none';
+        if (minimalPrefs.divider_style === 'none') {
+            hr.style.display = 'none';
+            hr.style.width = '0';
+            hr.style.height = '0';
+            hr.style.background = 'transparent';
+            hr.style.marginTop = '0';
+            hr.style.marginBottom = '0';
+            return;
+        }
+
+        hr.style.display = 'block';
+        hr.style.height = '1px';
+        hr.style.background = accentHex;
+        hr.style.marginTop = '32px';
+        hr.style.marginBottom = '32px';
+        if (minimalPrefs.divider_style === 'solid-short') {
+            hr.style.width = '72px';
+            hr.style.marginLeft = 'auto';
+            hr.style.marginRight = 'auto';
+        } else {
+            hr.style.width = '100%';
+            hr.style.marginLeft = '0';
+            hr.style.marginRight = '0';
+        }
+    });
+}
+
+function renderCurrentTheme() {
+    var themeId = selectedStyle.theme_id;
+    var preview = document.querySelector('.theme-preview[data-theme="' + themeId + '"]');
+    if (!preview) return;
+
+    document.querySelectorAll('.theme-preview').forEach(function(node) {
+        node.classList.remove('active');
+        node.style.display = 'none';
+    });
+
+    var originalHtml = originalPreviewHtml[themeId] || preview.innerHTML;
+    if (themeId === MINIMAL_THEME_ID) {
+        var accentHex = MINIMAL_ACCENTS[minimalPrefs.accent].hex;
+        preview.innerHTML = originalHtml.split(MINIMAL_BASE_ACCENT).join(accentHex);
+        preview.querySelectorAll('h1, h2, h3, h4, h5').forEach(function(el) {
+            el.style.textAlign = minimalPrefs.heading_align;
+            el.style.color = accentHex;
+        });
+        preview.querySelectorAll('strong, a').forEach(function(el) {
+            el.style.color = accentHex;
+        });
+        applyDividerStyle(preview, accentHex);
+    } else {
+        preview.innerHTML = originalHtml;
+    }
+
+    applyFontSizeToContainer(preview, selectedStyle.font_size || 15);
+    preview.classList.add('active');
+    preview.style.display = 'block';
+    document.getElementById('previewScroll').scrollTop = 0;
+    updatePreviewTitle();
+}
+
+function updateVariantPanel() {
+    var panel = document.getElementById('variantPanel');
+    if (selectedStyle.theme_id === MINIMAL_THEME_ID) {
+        panel.classList.add('is-visible');
+        syncButtonState('.color-chip', 'accent', minimalPrefs.accent);
+        syncButtonState('.align-btn', 'align', minimalPrefs.heading_align);
+        syncButtonState('.divider-btn', 'divider', minimalPrefs.divider_style);
+    } else {
+        panel.classList.remove('is-visible');
+    }
+}
 
 function switchTheme(themeId) {
-    // Hide all previews
-    var previews = document.querySelectorAll('.theme-preview');
-    for (var i = 0; i < previews.length; i++) {
-        previews[i].style.display = 'none';
-    }
-    // Show target
-    var target = document.querySelector('.theme-preview[data-theme="' + themeId + '"]');
-    if (target) {
-        target.style.display = 'block';
-    }
-    // Update button active states
-    var btns = document.querySelectorAll('.theme-btn');
-    for (var i = 0; i < btns.length; i++) {
-        if (btns[i].getAttribute('data-theme') === themeId) {
-            btns[i].classList.add('active');
+    selectedStyle.theme_id = themeId;
+    document.querySelectorAll('.theme-btn').forEach(function(btn) {
+        if (btn.getAttribute('data-theme') === themeId) {
+            btn.classList.add('active');
         } else {
-            btns[i].classList.remove('active');
+            btn.classList.remove('active');
         }
+    });
+
+    if (themeId === MINIMAL_THEME_ID) {
+        selectedStyle.accent = minimalPrefs.accent;
+        selectedStyle.heading_align = minimalPrefs.heading_align;
+        selectedStyle.divider_style = minimalPrefs.divider_style;
+    } else {
+        selectedStyle.accent = null;
+        selectedStyle.heading_align = null;
+        selectedStyle.divider_style = null;
     }
-    // Update selected theme + persist to /tmp via fetch (for publish.py)
-    selectedTheme = themeId;
-    try {
-        // Write to localStorage as reliable persistence
-        localStorage.setItem('wechat-format-theme', themeId);
-    } catch(e) {}
-    // Reset confirm button
+
+    updateVariantPanel();
+    renderCurrentTheme();
+    persistSelection();
+    resetActionButtons();
+}
+
+function setAccent(accent) {
+    minimalPrefs.accent = accent;
+    selectedStyle.accent = accent;
+    syncButtonState('.color-chip', 'accent', accent);
+    renderCurrentTheme();
+    persistSelection();
+}
+
+function setHeadingAlign(align) {
+    minimalPrefs.heading_align = align;
+    selectedStyle.heading_align = align;
+    syncButtonState('.align-btn', 'align', align);
+    renderCurrentTheme();
+    persistSelection();
+}
+
+function setDividerStyle(style) {
+    minimalPrefs.divider_style = style;
+    selectedStyle.divider_style = style;
+    syncButtonState('.divider-btn', 'divider', style);
+    renderCurrentTheme();
+    persistSelection();
+}
+
+function switchFontSize(size) {
+    selectedStyle.font_size = size;
+    syncButtonState('.chip-btn[data-size]', 'size', String(size));
+    renderCurrentTheme();
+    persistSelection();
+}
+
+function resetActionButtons() {
     var confirmBtn = document.getElementById('confirmBtn');
-    if (confirmBtn) {
-        confirmBtn.textContent = '✓ 确认 — 回到 Claude 回复主题名 推送到公众号';
-        confirmBtn.classList.remove('copied');
-    }
-    // Scroll preview to top
-    document.getElementById('previewScroll').scrollTop = 0;
+    confirmBtn.textContent = '保存当前选择（可选）';
+    confirmBtn.classList.remove('copied');
+}
+
+function confirmSelection() {
+    persistSelection();
+    var btn = document.getElementById('confirmBtn');
+    btn.textContent = '当前选择已保存';
+    btn.classList.add('copied');
 }
 
 function copyCurrentPreview() {
-    var target = document.querySelector('.theme-preview[data-theme="' + selectedTheme + '"]');
-    if (!target) return false;
+    var target = document.querySelector('.theme-preview[data-theme="' + selectedStyle.theme_id + '"]');
+    if (!target) return;
+    persistSelection();
 
-    // Temporarily make it selectable
     var range = document.createRange();
     range.selectNodeContents(target);
     var sel = window.getSelection();
@@ -340,96 +684,60 @@ function copyCurrentPreview() {
     var success = false;
     try {
         success = document.execCommand('copy');
-    } catch(e) {}
+    } catch (e) {}
 
     sel.removeAllRanges();
 
-    if (!success) {
-        // Fallback: Clipboard API
+    if (!success && window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
         var html = target.innerHTML;
         var blob = new Blob([html], { type: 'text/html' });
         var item = new ClipboardItem({ 'text/html': blob });
-        navigator.clipboard.write([item]).then(function() {
-            showCopied();
-        }).catch(function() {
+        navigator.clipboard.write([item]).then(showCopied).catch(function() {
             alert('复制失败，请手动选中文章内容复制');
         });
+        return;
+    }
+
+    if (!success) {
+        alert('复制失败，请手动选中文章内容复制');
         return;
     }
 
     showCopied();
 }
 
-function confirmAndCopy() {
-    var themeName = '';
-    var activeBtn = document.querySelector('.theme-btn.active');
-    if (activeBtn) {
-        themeName = activeBtn.textContent.replace('推荐', '').trim();
-    }
-    var btn = document.getElementById('confirmBtn');
-    btn.textContent = '✓ 已确认「' + themeName + '」— 回到 Claude 回复「' + themeName + '」推送到公众号';
-    btn.classList.add('copied');
-}
-
-function applyTheme() {
-    copyCurrentPreview();
-}
-
 function showCopied() {
     var btn = document.getElementById('copyBtn');
-    var themeName = '';
-    var activeBtn = document.querySelector('.theme-btn.active');
-    if (activeBtn) {
-        themeName = activeBtn.textContent.replace('推荐', '').trim();
-    }
-    btn.textContent = '已复制「' + themeName + '」到剪贴板 ✓';
+    btn.textContent = '已复制到剪贴板';
     btn.classList.add('copied');
     setTimeout(function() {
-        btn.textContent = '复制内容到剪贴板 去公众号粘贴';
+        btn.textContent = '复制内容到公众号';
         btn.classList.remove('copied');
-    }, 3000);
+    }, 2500);
 }
 
-function switchFontSize(size) {
-    // 更新按钮状态
-    document.querySelectorAll('.fs-btn').forEach(function(btn) {
-        if (parseInt(btn.dataset.size) === size) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-
-    // 找到所有预览区，修改 p 标签的 font-size
-    document.querySelectorAll('.theme-preview').forEach(function(preview) {
-        preview.querySelectorAll('p').forEach(function(p) {
-            var currentSize = parseInt(window.getComputedStyle(p).fontSize);
-            if (currentSize >= 14 && currentSize <= 16) {
-                p.style.fontSize = size + 'px';
-                p.style.lineHeight = size === 16 ? '1.75' : '1.8';
-            }
-        });
-        // 修改列表项文字
-        preview.querySelectorAll('[style*="font-size:15px"]').forEach(function(el) {
-            if (el.tagName === 'SPAN' || el.tagName === 'SECTION') {
-                el.style.fontSize = size + 'px';
-            }
-        });
-    });
-
-    // 保存选择到 localStorage
-    localStorage.setItem('wechat-format-fontsize', size);
-}
-
-// 页面加载时恢复上次选择
 document.addEventListener('DOMContentLoaded', function() {
-    var saved = localStorage.getItem('wechat-format-fontsize');
-    if (saved && saved !== '15') {
-        switchFontSize(parseInt(saved));
-    }
-});
+    renderAccentOptions();
 
-// ESC does nothing special here (no overlay)
+    document.querySelectorAll('.theme-preview').forEach(function(preview) {
+        originalPreviewHtml[preview.dataset.theme] = preview.innerHTML;
+    });
+
+    try {
+        var saved = localStorage.getItem('wechat-format-style');
+        if (saved) {
+            var parsed = JSON.parse(saved);
+            selectedStyle.theme_id = parsed.theme_id || selectedStyle.theme_id;
+            selectedStyle.font_size = parsed.font_size || selectedStyle.font_size;
+            if (parsed.accent) minimalPrefs.accent = parsed.accent;
+            if (parsed.heading_align) minimalPrefs.heading_align = parsed.heading_align;
+            if (parsed.divider_style) minimalPrefs.divider_style = parsed.divider_style;
+        }
+    } catch (e) {}
+
+    switchTheme(selectedStyle.theme_id || '{{DEFAULT_THEME}}');
+    switchFontSize(selectedStyle.font_size || 15);
+});
 </script>
 </body>
 </html>
