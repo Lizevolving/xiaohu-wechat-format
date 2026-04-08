@@ -27,12 +27,52 @@ import tempfile
 
 import requests
 
+# ── 导入共享工具（兼容直接执行和模块导入）───────────────────────────────
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+from utils import load_config
+
 # ── 路径 ──────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).parent
 SKILL_DIR = SCRIPT_DIR.parent
 
-with open(SKILL_DIR / "config.json", encoding="utf-8") as f:
-    CONFIG = json.load(f)
+_CONFIG = None
+
+
+def _get_config() -> dict:
+    global _CONFIG
+    if _CONFIG is None:
+        _CONFIG = load_config(SKILL_DIR)
+    return _CONFIG
+
+
+def _get_settings() -> dict:
+    settings = _get_config().get("settings")
+    return settings if isinstance(settings, dict) else {}
+
+
+def _get_wechat_config() -> dict:
+    wechat = _get_config().get("wechat")
+    return wechat if isinstance(wechat, dict) else {}
+
+
+def _get_default_theme() -> str:
+    return _get_settings().get("default_theme", "newspaper")
+
+
+def _get_default_author() -> str:
+    author = _get_wechat_config().get("author", "")
+    return author if isinstance(author, str) else ""
+
+
+def _get_legacy_output_dir() -> Path:
+    output_dir = _get_config().get("output_dir", "./wechat-output-cache")
+    if isinstance(output_dir, str) and output_dir.strip():
+        return Path(output_dir)
+    return Path("./wechat-output-cache")
+
+
 SELECTION_DIR = Path(tempfile.gettempdir()) / "wechat-format"
 STYLE_SELECTION_FILE = SELECTION_DIR / "selected-style.json"
 
@@ -45,7 +85,7 @@ def resolve_output_dir(input_path: Path) -> Path:
 # ── 微信 API ─────────────────────────────────────────────────────────
 def get_access_token():
     """获取微信 API access_token"""
-    wechat = CONFIG.get("wechat", {})
+    wechat = _get_wechat_config()
     app_id = wechat.get("app_id")
     app_secret = wechat.get("app_secret")
 
@@ -317,7 +357,7 @@ def main():
     parser.add_argument("--strong-style", choices=["color", "highlight"],
                         help="极简可调主题的加粗强调方式（仅 --input 模式有效）")
     parser.add_argument("--author", "-a",
-                        default=CONFIG.get("wechat", {}).get("author", ""),
+                        default=None,
                         help="作者名")
     parser.add_argument("--dry-run", action="store_true",
                         help="只做排版和图片上传，不推送草稿箱（用于测试）")
@@ -355,7 +395,7 @@ def main():
                     theme = saved
                     print(f"  使用 gallery 选中的主题: {theme}")
         if not theme:
-            theme = CONFIG["settings"]["default_theme"]
+            theme = _get_default_theme()
 
         # 先调用 format.py 排版
         input_path = Path(args.input).resolve()
@@ -384,7 +424,7 @@ def main():
         article_dir = resolve_output_dir(input_path)
         if not article_dir.exists():
             # 兼容旧版全局输出目录
-            legacy_output_base = Path(CONFIG["output_dir"])
+            legacy_output_base = _get_legacy_output_dir()
             file_stem = re.sub(r"-(公众号|小红书|微博)$", "", input_path.stem)
             legacy_dir = legacy_output_base / file_stem
             if legacy_dir.exists():
@@ -423,7 +463,7 @@ def main():
 
     # ── 3. 提取标题 ──────────────────────────────────────────────────
     title = args.title or extract_title_from_html(html) or article_dir.name
-    author = args.author
+    author = args.author if args.author is not None else _get_default_author()
     print(f"标题: {title}")
     print(f"作者: {author}")
 

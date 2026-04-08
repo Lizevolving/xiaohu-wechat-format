@@ -30,6 +30,12 @@ from pathlib import Path
 
 import markdown
 
+# ── 导入共享工具（兼容直接执行和模块导入）───────────────────────────────
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+from utils import load_config
+
 # ── 脚注占位符（UUID 防冲突）──────────────────────────────────────────
 _FN_PREFIX = f"__FN_{uuid.uuid4().hex[:8]}_"
 FOOTNOTE_PLACEHOLDERS = {
@@ -94,56 +100,53 @@ MINIMAL_FLEX_DIVIDERS = [
 MINIMAL_FLEX_STRONG_STYLES = ["color", "highlight"]
 MINIMAL_FLEX_FONT_SIZES = [15, 16, 17]
 
-# Gallery 示例文章（写死，不用用户文章）
-GALLERY_DEMO_MARKDOWN = """\
-## 主要功能
-
-在数字化时代，**内容创作**变得越来越重要。一款好的排版工具，能让你的文章在众多内容中**脱颖而出**。
-
-> 好的排版不只是视觉享受，更是对读者的尊重。
-
-### 核心亮点
-
-- 完整的 Markdown 语法支持
-- 精美的主题样式
-- 一键复制到微信发布
-
-1. 撰写你的内容
-2. 选择喜欢的风格
-3. 一键复制粘贴
-
----
-
-### 代码示例
-
-`inline code` 也是支持的。
-
-```python
-def hello():
-    print("Hello, World!")
-```
-
-| 功能 | 状态 |
-|------|------|
-| 实时预览 | 已支持 |
-| 主题选择 | 已支持 |
-
-> [!tip] 小技巧
-> 选择适合你文章风格的主题，效果更佳。
-"""
-
 # ── 路径 ────────────────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).parent
 SKILL_DIR = SCRIPT_DIR.parent
 THEMES_DIR = SKILL_DIR / "themes"
 TEMPLATE_DIR = SKILL_DIR / "templates"
 
-with open(SKILL_DIR / "config.json", encoding="utf-8") as f:
-    CONFIG = json.load(f)
+# ── 配置（懒加载，不阻塞 --help）─────────────────────────────────────
+_MISSING_CONFIG = object()
+_CONFIG = None
 
-VAULT_ROOT = Path(CONFIG["vault_root"])
-DEFAULT_THEME = CONFIG["settings"]["default_theme"]
-AUTO_OPEN = CONFIG["settings"]["auto_open_browser"]
+
+def _get_config() -> dict:
+    config = _get_optional_config()
+    if config:
+        return config
+    return load_config(SKILL_DIR)
+
+
+def _get_optional_config() -> dict:
+    global _CONFIG
+    if _CONFIG is None:
+        config_path = SKILL_DIR / "config.json"
+        _CONFIG = load_config(SKILL_DIR) if config_path.exists() else _MISSING_CONFIG
+    if _CONFIG is _MISSING_CONFIG:
+        return {}
+    return _CONFIG
+
+
+def _get_settings() -> dict:
+    settings = _get_optional_config().get("settings")
+    return settings if isinstance(settings, dict) else {}
+
+
+def _get_vault_root() -> Path:
+    vault_root = _get_optional_config().get("vault_root")
+    if isinstance(vault_root, str) and vault_root.strip():
+        return Path(vault_root)
+    return Path(".")
+
+
+def _get_default_theme() -> str:
+    return _get_settings().get("default_theme", "newspaper")
+
+
+def _get_auto_open() -> bool:
+    return _get_settings().get("auto_open_browser", True)
+
 SELECTION_DIR = Path(tempfile.gettempdir()) / "wechat-format"
 STYLE_SELECTION_FILE = SELECTION_DIR / "selected-style.json"
 THEME_SELECTION_FILE = SELECTION_DIR / "selected-theme.txt"
@@ -213,8 +216,9 @@ def build_style_selection(theme_id: str, accent: str | None = None,
 def write_selected_style(selection: dict, output_dir: Path = SELECTION_DIR) -> None:
     """写入结构化样式选择结果，同时保留旧的主题文件。"""
     output_dir.mkdir(parents=True, exist_ok=True)
+    theme_id = selection.get("theme_id") or _get_default_theme()
     normalized = build_style_selection(
-        selection.get("theme_id", DEFAULT_THEME),
+        theme_id,
         selection.get("accent"),
         selection.get("heading_align"),
         selection.get("divider_style"),
@@ -238,8 +242,9 @@ def read_selected_style(selection_dir: Path = SELECTION_DIR) -> dict | None:
         return None
     try:
         raw = json.loads(style_file.read_text(encoding="utf-8"))
+        theme_id = raw.get("theme_id") or _get_default_theme()
         return build_style_selection(
-            raw.get("theme_id", DEFAULT_THEME),
+            theme_id,
             raw.get("accent"),
             raw.get("heading_align"),
             raw.get("divider_style"),
@@ -635,17 +640,11 @@ def convert_wikilinks(text: str, vault_root: Path, output_dir: Path) -> str:
     images_dir = output_dir / "images"
     # 搜索路径：vault 目录（如需额外图片目录，在 config.json 的 image_search_paths 中配置）
     search_roots = [vault_root]
-    # 支持自定义图片搜索目录
-    config_path = SKILL_DIR / "config.json"
-    if config_path.exists():
-        import json as _json
-        try:
-            with open(config_path, encoding="utf-8") as f:
-                _cfg = _json.load(f)
-            for p in _cfg.get("image_search_paths", []):
-                search_roots.append(Path(p).expanduser())
-        except Exception:
-            pass
+    image_search_paths = _get_optional_config().get("image_search_paths", [])
+    if isinstance(image_search_paths, list):
+        for path_value in image_search_paths:
+            if isinstance(path_value, str) and path_value.strip():
+                search_roots.append(Path(path_value).expanduser())
 
     def replace_img(match):
         filename = match.group(1).strip()
@@ -1889,8 +1888,6 @@ def generate_gallery(rendered_map: dict, theme_map: dict,
     # 写入默认选择结果，后续可由 gallery 服务更新。
     write_selected_style(build_style_selection(default_theme), SELECTION_DIR)
 
-    write_selected_style(build_style_selection(default_theme), SELECTION_DIR)
-
     output_path = output_dir / "gallery.html"
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path.write_text(gallery_html, encoding="utf-8")
@@ -1974,7 +1971,7 @@ def format_for_output(content: str, input_path: Path, theme: dict,
 def main():
     parser = argparse.ArgumentParser(description="微信公众号文章排版工具")
     parser.add_argument("--input", "-i", help="输入 Markdown 文件路径")
-    parser.add_argument("--theme", "-t", default=DEFAULT_THEME, help=f"主题名称（默认: {DEFAULT_THEME}）")
+    parser.add_argument("--theme", "-t", default=None, help="主题名称（默认读取 config）")
     parser.add_argument("--accent", choices=list(MINIMAL_FLEX_ACCENTS.keys()),
                         help=f"极简可调主题的强调色（仅 {MINIMAL_FLEX_THEME_ID} 可用）")
     parser.add_argument("--heading-align", choices=MINIMAL_FLEX_ALIGNS,
@@ -1983,7 +1980,7 @@ def main():
                         help=f"极简可调主题的分隔线样式（仅 {MINIMAL_FLEX_THEME_ID} 可用）")
     parser.add_argument("--strong-style", choices=MINIMAL_FLEX_STRONG_STYLES,
                         help=f"极简可调主题的加粗强调方式（仅 {MINIMAL_FLEX_THEME_ID} 可用）")
-    parser.add_argument("--vault-root", default=str(VAULT_ROOT), help="Obsidian Vault 根目录")
+    parser.add_argument("--vault-root", default=None, help="Obsidian Vault 根目录")
     parser.add_argument("--output", "-o", default=None, help="输出目录（默认: 当前 Markdown 同级的 wechat output/）")
     parser.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
     parser.add_argument("--gallery", action="store_true", help="主题画廊模式：预览多个主题供选择")
@@ -2008,9 +2005,9 @@ def main():
         parser.error("--input 是必填参数")
 
     input_path = Path(args.input).resolve()
-    vault_root = Path(args.vault_root)
+    vault_root = Path(args.vault_root) if args.vault_root else _get_vault_root()
     output_dir = resolve_output_dir(input_path, args.output)
-    theme_name = args.theme
+    theme_name = args.theme or _get_default_theme()
 
     # 验证输入文件
     if not input_path.exists():
@@ -2126,7 +2123,7 @@ def main():
         else:
             print(f"画廊页面: {gallery_path.resolve().as_uri()}")
 
-        if AUTO_OPEN and not args.no_open:
+        if not args.no_open and _get_auto_open():
             webbrowser.open(open_target)
             print("已在浏览器中打开画廊")
 
@@ -2158,7 +2155,7 @@ def main():
     print(f"排版成品: {preview_path.resolve()}")
     print(f"预览地址: {preview_path.resolve().as_uri()}")
 
-    if AUTO_OPEN and not args.no_open:
+    if not args.no_open and _get_auto_open():
         webbrowser.open(preview_path.resolve().as_uri())
         print("已在浏览器中打开预览")
 
