@@ -4,7 +4,7 @@
 """
 API 生图脚本
 
-- 从本技能目录读取 config.json（找不到则回退 config.example.json）
+- 从指定路径读取真实配置文件
 - 从提示词文件读取 YAML 头部：
   - aspect_ratio: 必须
   - image_size: 可选（未提供则用 config.settings.image_size）
@@ -25,6 +25,12 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+# ── 导入共享工具（兼容直接执行和模块导入）───────────────────────────────
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+from utils import load_config_file
 
 
 def _eprint(*args, **kwargs):
@@ -336,27 +342,6 @@ def _build_payload(prompt: str, aspect_ratio: str, image_size: str | None, ref_i
     }
 
 
-def _load_config(config_path: pathlib.Path) -> dict:
-    """
-    优先读取 config.json；不存在则回退到 config.example.json（便于独立分享场景）。
-    """
-    if config_path.exists():
-        cfg = _read_json(config_path)
-        if isinstance(cfg, dict):
-            return cfg
-        raise SystemExit(f"配置文件不是 JSON 对象：{config_path}")
-
-    example = config_path.parent / "config.example.json"
-    if example.exists():
-        _eprint(f"提示：未找到 config.json，正在使用示例配置：{example}")
-        cfg = _read_json(example)
-        if isinstance(cfg, dict):
-            return cfg
-        raise SystemExit(f"示例配置不是 JSON 对象：{example}")
-
-    raise SystemExit(f"未找到配置文件：{config_path}（也不存在 config.example.json）")
-
-
 def _get_cfg(cfg: dict) -> tuple[str, dict, dict]:
     output_dir = cfg.get("output_dir")
     settings = cfg.get("settings") if isinstance(cfg.get("settings"), dict) else {}
@@ -425,7 +410,7 @@ def _try_convert_image_bytes(img_bytes: bytes, out_path: pathlib.Path, jpg_quali
 
 def main():
     ap = argparse.ArgumentParser(description="API 生图：调用 Gemini generateContent 接口生成图片并落盘。")
-    ap.add_argument("--config", default=None, help="配置文件路径（默认：本技能目录下 config.json）")
+    ap.add_argument("--config", default=None, help="配置文件路径（默认：本仓库 cover/config.json）")
 
     ap.add_argument("--prompt-file", default=None, help="提示词文件路径（建议：带 YAML 头部）")
     ap.add_argument("--prompt", default=None, help="提示词文本（调试用）")
@@ -440,8 +425,12 @@ def main():
     args = ap.parse_args()
 
     skill_dir = pathlib.Path(__file__).resolve().parent.parent
-    config_path = pathlib.Path(args.config).expanduser().resolve() if args.config else (skill_dir / "config.json")
-    cfg = _load_config(config_path)
+    default_config_path = skill_dir / "cover" / "config.json"
+    config_path = pathlib.Path(args.config).expanduser().resolve() if args.config else default_config_path
+    cfg = load_config_file(
+        config_path,
+        example_path=config_path.parent / "config.example.json",
+    )
     output_dir, settings, secrets = _get_cfg(cfg)
 
     base_url = str(settings.get("base_url") or "").strip()

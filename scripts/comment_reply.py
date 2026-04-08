@@ -18,13 +18,19 @@ import argparse
 import json
 import os
 import re
+import sys
 import time
 import requests
 from pathlib import Path
 from datetime import datetime
 
+# ── 导入共享工具（兼容直接执行和模块导入）───────────────────────────────
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, _SCRIPTS_DIR)
+from utils import load_config as load_required_config
+
 SCRIPT_DIR = Path(__file__).parent
-CONFIG_PATH = SCRIPT_DIR.parent / "config.json"
 STATE_PATH = SCRIPT_DIR.parent / "comment_state.json"
 LOG_PATH = SCRIPT_DIR.parent / "comment_reply.log"
 
@@ -95,9 +101,8 @@ def log(msg):
         f.write(line + "\n")
 
 
-def load_config():
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+def load_runtime_config():
+    return load_required_config(SCRIPT_DIR.parent)
 
 
 def load_state():
@@ -257,7 +262,7 @@ def main():
     log("=" * 40)
     log("评论自动回复启动")
 
-    config = load_config()
+    config = load_runtime_config()
     state = load_state()
 
     # AI 配置（从本技能 config.json 的 ai 字段读取，或环境变量 OPENROUTER_API_KEY）

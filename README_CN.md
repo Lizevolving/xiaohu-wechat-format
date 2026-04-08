@@ -43,7 +43,7 @@ Codex 有两种常见用法：
 
 ## 配置
 
-编辑 `config.json`：
+如果你要推送、评论自动回复、封面生成，或想设置 `vault_root` 这类默认值，再创建 `config.json`：
 
 ```json
 {
@@ -66,8 +66,9 @@ Codex 有两种常见用法：
 ```
 
 - 现在默认会在源 Markdown 同级目录下创建 `wechat output/`。
+- 纯 `scripts/format.py` 排版，不带 `config.json` 也能跑。
 - `output_dir` 保留为旧流程兼容用的兜底目录。
-- `wechat` 只在发布时需要。
+- `wechat` 只在发布或评论自动回复时需要。
 - `cover` 只在生成封面时需要。
 
 ## 排版文章

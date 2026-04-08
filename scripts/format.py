@@ -106,35 +106,24 @@ SKILL_DIR = SCRIPT_DIR.parent
 THEMES_DIR = SKILL_DIR / "themes"
 TEMPLATE_DIR = SKILL_DIR / "templates"
 
-# ── 配置（懒加载，不阻塞 --help）─────────────────────────────────────
-_MISSING_CONFIG = object()
+# ── 配置（懒加载，不阻塞 --help；纯 format 允许无 config）─────────────────
 _CONFIG = None
 
 
 def _get_config() -> dict:
-    config = _get_optional_config()
-    if config:
-        return config
-    return load_config(SKILL_DIR)
-
-
-def _get_optional_config() -> dict:
     global _CONFIG
     if _CONFIG is None:
-        config_path = SKILL_DIR / "config.json"
-        _CONFIG = load_config(SKILL_DIR) if config_path.exists() else _MISSING_CONFIG
-    if _CONFIG is _MISSING_CONFIG:
-        return {}
+        _CONFIG = load_config(SKILL_DIR, required=False)
     return _CONFIG
 
 
 def _get_settings() -> dict:
-    settings = _get_optional_config().get("settings")
+    settings = _get_config().get("settings")
     return settings if isinstance(settings, dict) else {}
 
 
 def _get_vault_root() -> Path:
-    vault_root = _get_optional_config().get("vault_root")
+    vault_root = _get_config().get("vault_root")
     if isinstance(vault_root, str) and vault_root.strip():
         return Path(vault_root)
     return Path(".")
@@ -640,7 +629,7 @@ def convert_wikilinks(text: str, vault_root: Path, output_dir: Path) -> str:
     images_dir = output_dir / "images"
     # 搜索路径：vault 目录（如需额外图片目录，在 config.json 的 image_search_paths 中配置）
     search_roots = [vault_root]
-    image_search_paths = _get_optional_config().get("image_search_paths", [])
+    image_search_paths = _get_config().get("image_search_paths", [])
     if isinstance(image_search_paths, list):
         for path_value in image_search_paths:
             if isinstance(path_value, str) and path_value.strip():

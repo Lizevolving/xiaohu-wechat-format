@@ -43,7 +43,7 @@ Codex can use this repo in two ways:
 
 ## Configuration
 
-Edit `config.json`:
+If you need publish, comment reply, cover generation, or custom defaults like `vault_root`, create `config.json`:
 
 ```json
 {
@@ -66,8 +66,9 @@ Edit `config.json`:
 ```
 
 - Normal formatting now writes to a new `wechat output/` folder next to the source Markdown file.
+- Pure `scripts/format.py` formatting works without `config.json`.
 - `output_dir` is kept as a legacy fallback for older flows.
-- `wechat` is only required for publishing.
+- `wechat` is only required for publishing or comment reply.
 - `cover` is only required for cover generation.
 
 ## Format an Article
